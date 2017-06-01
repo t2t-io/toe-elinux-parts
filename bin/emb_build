@@ -6,14 +6,17 @@ function mycli_command_prerequisites {
 cat <<__EOF__
 kpartx
 losetup
+shyaml
 python2:colorama
 python3:colorama
 __EOF__
 }
 
+
 function read_without_comments {
 	cat $1 | grep -v "^#" | grep -v "^$"
 }
+
 
 function is_argument_valid {
 	[ "" == "$1" ] && return 0
@@ -37,6 +40,13 @@ $(read_without_comments ./boards.conf | awk '{printf "\t- %s\n", $0}')
 
 Here are supported ENVs:
 $(read_without_comments ${CLI_RESOURCE_DIR}/envs.conf | awk '{printf "\t- %s\n", $0}')
+
+Here are additional environment variables to change build behaviors:
+	BOARD_IMAGE_URL
+		The url to download archive image (e.g. xxx.sqfs.xz) as base image to build.
+		When the url is not specified, the ${CLI_ACTION} subcommand shall call
+		${TEAM_RESOURCE_DIR}/pick-image with PROFILE/BOARD/ENV to pick up a proper
+		archive image as base image to build.
 __EOF__
 }
 
@@ -91,9 +101,16 @@ function initiate_build_variables {
 	export OUTPUT_DIR="/tmp"
 	export BUILD_PARTS_CONF_JSON="${OUTPUT_DIR}/${BUILD_NAME}.json"
 
+	if [ "" == "${BOARD_IMAGE_URL}" ]; then
+		export BOARD_IMAGE_URL=$(${TEAM_RESOURCE_DIR}/pick-image ${BUILD_BOARD_PROFILE} ${BUILD_BOARD_NAME} ${BUILD_BOARD_ENV})
+		[ "0" != "$?" ] && ERR "cannot find image url for ${BUILD_BOARD_PROFILE}/${BUILD_BOARD_NAME}/${BUILD_BOARD_ENV}" && return 1
+		[ "" == "${BOARD_IMAGE_URL}" ] && ERR "unexpected empty image url for ${BUILD_BOARD_PROFILE}/${BUILD_BOARD_NAME}/${BUILD_BOARD_ENV}" && return 1
+	fi
+
 	INFO "BUILD_BOARD_PROFILE = ${BUILD_BOARD_PROFILE}"
 	INFO "BUILD_BOARD_NAME    = ${BUILD_BOARD_NAME}"
 	INFO "BUILD_BOARD_ENV     = ${BUILD_BOARD_ENV}"
+	INFO "BOARD_IMAGE_URL     = ${BOARD_IMAGE_URL}"
 
 	export TRANSFORM="${TEAM_EXTERNAL_DIR}/elinux-tools/tools/transform.js"
 	local EXIT_CODE="0"
@@ -104,18 +121,49 @@ function initiate_build_variables {
 	EXIT_CODE=$?
 	rm -f ${TMP0} ${TMP1} ${TMP2}
 	[ "0" != "${EXIT_CODE}" ] && return ${EXIT_CODE}
+	return 0
+}
+
+
+function download_and_build {
+	local DOWNLOAD_URL=${BOARD_IMAGE_URL}
+	local FILENAME=$(basename ${DOWNLOAD_URL})
+	local NAME=${FILENAME%.*}
+	local DOWNLOAD_FILE="${CACHE_DIR}/${FILENAME}"
+	local ARCHIVE_IMAGE_FILE="${CACHE_DIR}/${NAME}"
+	local BUILD_DIR="${OUTPUT_DIR}/${BUILD_NAME}"
+	local BUILD_IMAGE="${OUTPUT_DIR}/${BUILD_NAME}.sqfs"
+	local COMMAND=""
+
+	INFO "checking ${DOWNLOAD_FILE} ..."
+	if [ ! -f "${DOWNLOAD_FILE}" ]; then
+		COMMAND="wget -O ${DOWNLOAD_FILE} ${DOWNLOAD_URL}"
+		INFO "$(PURPLE ${COMMAND})" && ${COMMAND}
+		[ "0" != "$?" ] && ERR "failed to download ${DOWNLOAD_URL}" && return 1
+	fi
+
+	INFO "checking ${ARCHIVE_IMAGE_FILE} ..."
+	if [ ! -f "${ARCHIVE_IMAGE_FILE}" ]; then
+		RUN_CMD "unxz -k ${DOWNLOAD_FILE}"
+		[ "0" != "$?" ] && ERR "failed to uncompress ${DOWNLOAD_FILE}" && return 2
+	fi
+	
+	[ ! -f "${ARCHIVE_IMAGE_FILE}" ] && ERR "still missing ${DEVICE_IMAGE_FILE}" && return 3
+	return 0
 }
 
 
 function mycli_command_entry {
 	initiate_build_variables $@ || exit $?
-	INFO "CLI_DIR = ${CLI_DIR}"
-	INFO "CLI_BIN_DIR = ${CLI_BIN_DIR}"
-	INFO "CLI_HELPER_DIR = ${CLI_HELPER_DIR}"
-	INFO "CLI_RESOURCE_DIR = ${CLI_RESOURCE_DIR}"
-	INFO "CLI_NAME = ${CLI_NAME}"
-	INFO "CLI_PROJECT_NAME = ${CLI_PROJECT_NAME}"
-	INFO "CLI_ACTION = ${CLI_ACTION}"
-	INFO "BASH_SOURCE = ${BASH_SOURCE[0]}"
-	INFO "arguments: $@"
+	download_and_build
+
+	# INFO "CLI_DIR = ${CLI_DIR}"
+	# INFO "CLI_BIN_DIR = ${CLI_BIN_DIR}"
+	# INFO "CLI_HELPER_DIR = ${CLI_HELPER_DIR}"
+	# INFO "CLI_RESOURCE_DIR = ${CLI_RESOURCE_DIR}"
+	# INFO "CLI_NAME = ${CLI_NAME}"
+	# INFO "CLI_PROJECT_NAME = ${CLI_PROJECT_NAME}"
+	# INFO "CLI_ACTION = ${CLI_ACTION}"
+	# INFO "BASH_SOURCE = ${BASH_SOURCE[0]}"
+	# INFO "arguments: $@"
 }
