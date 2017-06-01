@@ -1,0 +1,91 @@
+#!/bin/bash
+#
+
+# Here are variables initiated by load_and_run script:
+#
+#  - PART_NAME
+#  - PART_DIR
+#
+# Here are variables initiated by apply_parts command,
+# stored in ${WORK_DIR}/env.bash
+# 
+#  - CLI_DIR
+#  - ELINUX_TOOLS_DIR
+#
+#  (Following variables are retrieved from ${ARCHIVE_DIR}/rootfs.yaml)
+#  - BOARD_DIST_CODENAME   bone, raspbian, ...
+#  - DIST_CODENAME         trusty, jessie, ...
+#  - DIST_NAME             ubuntu, debian, ...
+#  - KERNEL_ARCHITECTURE   armv7l
+#  - KERNEL                linux
+#  - KERNEL_VERSION        4.1.17-ti-rt-r47
+#
+#  (Following variables are retrieved from the config.json passed to apply_parts subcommand, all are optional)
+#  - BOARD                 bbgw, bbg, piz, pizw, ...
+#  - BOARD_ENV             production, testing, development, ...
+#  - BOARD_PROFILE         abc, def, spider, ...
+#
+#  (Following variables are derived from parent process `emb_apply_parts`)
+#  - AD_BUILD_CONF_JSON=/tmp/xxx.json
+#  - AD_BUILD_WORK_ENV_BASH=/tmp/xxx-20170413223843/partitions/p2/work/apply_parts_20170413223843/env.bash
+#  - AD_BUILD_WORK_ENV_JSON=/tmp/xxx-20170413223843/partitions/p2/work/apply_parts_20170413223843/env.json
+#  
+#  - AD_BUILD_WORK_PARTS_DIR=/tmp/xxx-20170413223843/partitions/p2/work/apply_parts_20170413223843/parts
+#  - AD_BUILD_WORK_PARTS_FILE=/tmp/xxx-20170413223843/partitions/p2/work/apply_parts_20170413223843/parts.txt
+#
+#  - AD_BUILD_WORK_DEBIAN_PKG_LIST=/tmp/xxx-20170413223843/partitions/p2/work/apply_parts_20170413223843/package-debian.txt
+#  - AD_BUILD_WORK_PYTHON2_PKG_LIST=/tmp/xxx-20170413223843/partitions/p2/work/apply_parts_20170413223843/package-python2.txt
+#  - AD_BUILD_WORK_PYTHON3_PKG_LIST=/tmp/xxx-20170413223843/partitions/p2/work/apply_parts_20170413223843/package-python3.txt
+#  
+#  - AD_BUILD_WORK_TOPDIR=/tmp/xxx-20170413223843/partitions/p2/work/apply_parts_20170413223843
+#
+#  - AD_CONF_JSON=/tmp/xxx-20170413223843/config.json
+#  - AD_PARTITION_DIR=/tmp/xxx-20170413223843/partitions
+#
+#  - AD_ROOTFS_DIR=/tmp/xxx-20170413223843/partitions/p2
+#  - AD_ROOTFS_METADATA_FILE=/tmp/xxx-20170413223843/rootfs.yaml
+#  - AD_ROOTFS_PARTITION=p2
+#  - AD_ROOTFS_TYPE=bone
+#
+#  - AD_TOPDIR=/tmp/xxx-20170413223843
+#
+# 
+
+
+# Before archive directory is manipulated.
+# 
+function pre_image {
+	return 0
+}
+
+
+# After copying files to root-fs and partition directories.
+#	- elinux-common/copy_partitions      , rsync `${PART}/partitions/p[0-9]/*` to `${AD_PARTITION_DIR}/p[0-9]`
+#	- elinux-common/copy_rootfs          , rsync `${PART}/rootfs/*` to `${AD_PARTITION_DIR}/${AD_ROOTFS_PARTITION}`
+#	- elinux-common/copy_service_files
+#	    for s of services
+#	        find ${PART_DIR}/assets/services/${s}/*
+#	        copy them to ${AD_BUILD_WORK_TOPDIR}/elinux-common/services/${s}
+#	        maybe in the future, implement copy-with-template
+#
+# Before running script inside rootfs with chroot and qemu (guest script).
+#
+function pre_guest {
+	return 0
+}
+
+
+# After running script inside rootfs with chroot and qemu
+# Before cleanup temporary/cache files in archive directory
+#
+function post_guest {
+	return 0
+}
+
+
+# After cleanup temporary/cache files in archive directory
+#
+function post_image {
+	return 0
+}
+

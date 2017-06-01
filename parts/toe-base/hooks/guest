@@ -1,0 +1,60 @@
+#!/bin/bash
+#
+
+# Here are variables initiated by load_and_run script:
+#
+#  - PART_NAME
+#  - PART_DIR
+#
+# Here are variables initiated by apply_parts command,
+# stored in ${WORK_DIR}/env.bash
+# 
+#  - AD_BUILD_WORK_TOPDIR           , e.g. /tmp/elinux-tools/apply_parts_20170409164024
+#  - AD_BUILD_WORK_DEBIAN_PKG_LIST  , e.g. /tmp/elinux-tools/apply_parts_20170409164024/package-debian.txt
+#  - AD_BUILD_WORK_PYTHON2_PKG_LIST , e.g. /tmp/elinux-tools/apply_parts_20170409164024/package-python2.txt
+#  - AD_BUILD_WORK_PYTHON3_PKG_LIST ' e.g. /tmp/elinux-tools/apply_parts_20170409164024/package-python3.txt
+#  - CLI_DIR
+#  - ELINUX_TOOLS_DIR
+#
+#  (Following variables are retrieved from ${ARCHIVE_DIR}/rootfs.yaml)
+#  - BOARD_DIST_CODENAME   bone, raspbian, ...
+#  - DIST_CODENAME         trusty, jessie, ...
+#  - DIST_NAME             ubuntu, debian, ...
+#  - KERNEL_ARCHITECTURE   armv7l
+#  - KERNEL                linux
+#  - KERNEL_VERSION        4.1.17-ti-rt-r47
+#
+#  (Following variables are retrieved from the config.json passed to apply_parts subcommand, all are optional)
+#  - BOARD                 bbgw, bbg, piz, pizw, ...
+#  - BOARD_ENV             production, testing, development, ...
+#  - BOARD_PROFILE         abc, def, spider, ...
+#
+# 
+
+
+#
+# The chroot_entry (guest script) running inside qemu with chroot,
+# is invoked after following services are performed:
+#
+#	- elinux-common/run_all_services
+#	  # useradd
+#	    find ${AD_BUILD_WORK_TOPDIR}/elinux-common/services/useradd/*
+#		apply user-add function on each found file
+#
+# Please note, following variables derived from parent process `emb_apply_parts`
+# are reloaded from the generated `env.bash`. These variables are reloaded as 
+# relative path in chroot:
+# 
+#  - AD_BUILD_WORK_TOPDIR
+#  - AD_BUILD_WORK_DEBIAN_PKG_LIST
+#  - AD_BUILD_WORK_PYTHON2_PKG_LIST
+#  - AD_BUILD_WORK_PYTHON3_PKG_LIST
+#
+#  - CLI_DIR
+#  - BASH_UTIL_DIR
+#  - ELINUX_TOOLS_DIR
+#
+function chroot_entry {
+	INFO "${PART_NAME} => uname -a"
+	return 0
+}

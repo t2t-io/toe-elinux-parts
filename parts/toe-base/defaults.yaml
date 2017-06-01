@@ -1,0 +1,25 @@
+
+##
+# Add environment variables with default values when performing 
+# the part hook scripts.
+#
+# For example, when you add a variable AAA_BBB in this configuration
+# file under the part with name `xxx-yyy-zzz`. Then, in the hook
+# bash script can use the environment variable XXX_YYY_ZZZ_AAA_BBB.
+#
+# And, this defaults file is an YAML configuration file, which can
+# support primitive types. For example:
+#
+#  AAA: true
+#  BBB: 12
+#  CCC: goodbye
+#
+# The value of `CCC` variable is treated as a string, so you don't
+# need "goodbye" with quote. For more details, please refer to 
+# YAML specification.
+#
+
+#AAA: true
+#BBB: 12
+#CCC: goodbye
+#DDD: https://en.wikipedia.org/
