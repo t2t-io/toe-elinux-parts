@@ -1,0 +1,33 @@
+## Template for Build profile.
+#
+name: {{BUILD_BOARD_PROFILE}}
+
+parts:
+    - toe-base
+    - toe-{{BUILD_TEAM_NAME}}-base
+
+envs:
+    # Possible values: `bbg`, `bbgw`, `piz`, `pizw`, `pi2`, `pi3`
+    #
+    board_name: {{BUILD_BOARD_NAME}}
+
+    # Possible values: `production`, `development`, `testing`
+    #
+    board_env: {{BUILD_BOARD_ENV}}
+
+    # Possible values: `foop`, `dhvac`, `conscious`, `webcam`, `spider` ...
+    #
+    board_profile: {{BUILD_BOARD_PROFILE}}
+
+
+configs:
+    elinux-common:
+        TIMEZONE: Asia/Tokyo
+
+    toe-base:
+        AAA: bbb
+
+    toe-{{BUILD_TEAM_NAME}}-base:
+        CCC: 12
+        DDD: true
+        EEE: hell world

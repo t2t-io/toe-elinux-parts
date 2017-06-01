@@ -1,0 +1,120 @@
+#!/bin/bash
+#
+##DOC:	perform several tests in development...
+
+function mycli_command_prerequisites {
+cat <<__EOF__
+kpartx
+losetup
+python2:colorama
+python3:colorama
+__EOF__
+}
+
+function read_without_comments {
+	cat $1 | grep -v "^#" | grep -v "^$"
+}
+
+function is_argument_valid {
+	[ "" == "$1" ] && return 0
+	[ "" == "$2" ] && return 0
+	local RESULT=$(read_without_comments $1 | grep "^$2$")
+	[ "" == "${RESULT}" ] && return 0
+	echo ${RESULT}
+}
+
+
+function mycli_command_help {
+cd $(dirname $0)/../resources
+cat <<__EOF__
+${CLI_NAME} ${CLI_ACTION} $(GREEN PROFILE BOARD ENV) $(GRAY [PARTS_CONFIG_YAML])
+
+Here are supported PROFILEs:
+$(read_without_comments ./profiles.conf | awk '{printf "\t- %s\n", $0}')
+
+Here are supported BOARDs:
+$(read_without_comments ./boards.conf | awk '{printf "\t- %s\n", $0}')
+
+Here are supported ENVs:
+$(read_without_comments ${CLI_RESOURCE_DIR}/envs.conf | awk '{printf "\t- %s\n", $0}')
+__EOF__
+}
+
+
+function generate_parts_conf {
+	${TRANSFORM} yaml2json -s ${CLI_RESOURCE_DIR}/build-template.yaml -o ${TMP0} || return 1
+	for arg in "$@"; do
+		local THIS_CONF=$(mktemp /tmp/XXXXXX)
+		${TRANSFORM} yaml2json -s $arg -o ${THIS_CONF}
+		if [ "0" != "$?" ]; then
+			rm -f ${THIS_CONF}
+			cat ${TMP1} | xargs -I{} sh -c "rm -f {}"
+			return 2
+		else
+			echo ${THIS_CONF} >> ${TMP1}
+		fi
+	done
+	${TRANSFORM} jsons -o ${BUILD_PARTS_CONF_JSON} ${TMP0} $(cat ${TMP1} | tr '\n' ' ') || return 3
+	cat ${BUILD_PARTS_CONF_JSON} | jq .
+}
+
+
+function initiate_build_variables {
+	local CURRENT=$(pwd)      ; cd $(dirname $0)
+	export TEAM_BIN_DIR=$(pwd); cd ..
+	export TEAM_DIR=$(pwd)    ; cd ${CURRENT}
+
+	export TEAM_EXTERNAL_DIR="${TEAM_DIR}/externals"
+	export TEAM_RESOURCE_DIR="${TEAM_DIR}/resources"
+	export TEAM_FULLNAME=$(basename ${TEAM_DIR})
+	export TEAM_NAME=$(echo ${TEAM_FULLNAME} | tr '-' '\n' | tail -n1)
+
+	local PROFILES_CONF="${TEAM_RESOURCE_DIR}/profiles.conf"
+	local BOARDS_CONF="${TEAM_RESOURCE_DIR}/boards.conf"
+	local ENVS_CONF="${CLI_RESOURCE_DIR}/envs.conf"
+
+	export BUILD_TEAM_NAME=${TEAM_NAME}
+	export BUILD_BOARD_PROFILE=$1; shift
+	export BUILD_BOARD_NAME=$1   ; shift
+	export BUILD_BOARD_ENV=$1    ; shift
+	[ "" == "${BUILD_BOARD_PROFILE}" ] && export BUILD_BOARD_PROFILE=$(read_without_comments ${PROFILES_CONF} | head -n1)
+	[ "" == "${BUILD_BOARD_NAME}" ]    && export BUILD_BOARD_NAME=$(read_without_comments ${BOARDS_CONF} | head -n1)
+	[ "" == "${BUILD_BOARD_ENV}" ]     && export BUILD_BOARD_ENV=$(read_without_comments ${ENVS_CONF} | head -n1)
+
+	[ "" == "$(is_argument_valid ${PROFILES_CONF} ${BUILD_BOARD_PROFILE})" ] && ERR "no such profile: ${BUILD_BOARD_PROFILE}" && return 1
+	[ "" == "$(is_argument_valid ${BOARDS_CONF} ${BUILD_BOARD_NAME})" ]      && ERR "no such board: ${BUILD_BOARD_NAME}" && return 1
+	[ "" == "$(is_argument_valid ${ENVS_CONF} ${BUILD_BOARD_ENV})" ]         && ERR "no such env: ${BUILD_BOARD_ENV}" && return 1
+
+	export BUILD_NAME="${BUILD_BOARD_PROFILE}-${BUILD_BOARD_NAME}-$(date '+%Y%m%d%H%M%S')"
+	export CACHE_DIR="/var/lib/${TEAM_FULLNAME}"
+	export OUTPUT_DIR="/tmp"
+	export BUILD_PARTS_CONF_JSON="${OUTPUT_DIR}/${BUILD_NAME}.json"
+
+	INFO "BUILD_BOARD_PROFILE = ${BUILD_BOARD_PROFILE}"
+	INFO "BUILD_BOARD_NAME    = ${BUILD_BOARD_NAME}"
+	INFO "BUILD_BOARD_ENV     = ${BUILD_BOARD_ENV}"
+
+	export TRANSFORM="${TEAM_EXTERNAL_DIR}/elinux-tools/tools/transform.js"
+	local EXIT_CODE="0"
+	local TMP0=$(mktemp /tmp/XXXXXX)
+	local TMP1=$(mktemp /tmp/XXXXXX)
+	TMP0=${TMP0} TMP1=${TMP1} generate_parts_conf $@
+	EXIT_CODE=$?
+	rm -f ${TMP0}
+	rm -f ${TMP1}
+	[ "0" != "${EXIT_CODE}" ] && return ${EXIT_CODE}
+}
+
+
+function mycli_command_entry {
+	initiate_build_variables $@ || exit $?
+	INFO "CLI_DIR = ${CLI_DIR}"
+	INFO "CLI_BIN_DIR = ${CLI_BIN_DIR}"
+	INFO "CLI_HELPER_DIR = ${CLI_HELPER_DIR}"
+	INFO "CLI_RESOURCE_DIR = ${CLI_RESOURCE_DIR}"
+	INFO "CLI_NAME = ${CLI_NAME}"
+	INFO "CLI_PROJECT_NAME = ${CLI_PROJECT_NAME}"
+	INFO "CLI_ACTION = ${CLI_ACTION}"
+	INFO "BASH_SOURCE = ${BASH_SOURCE[0]}"
+	INFO "arguments: $@"
+}
