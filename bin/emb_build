@@ -134,6 +134,7 @@ function download_and_build {
 	local BUILD_DIR="${OUTPUT_DIR}/${BUILD_NAME}"
 	local BUILD_IMAGE="${OUTPUT_DIR}/${BUILD_NAME}.sqfs"
 	local COMMAND=""
+	local EXIT_CODE="0"
 
 	INFO "checking ${DOWNLOAD_FILE} ..."
 	if [ ! -f "${DOWNLOAD_FILE}" ]; then
@@ -147,9 +148,35 @@ function download_and_build {
 		RUN_CMD "unxz -k ${DOWNLOAD_FILE}"
 		[ "0" != "$?" ] && ERR "failed to uncompress ${DOWNLOAD_FILE}" && return 2
 	fi
-	
 	[ ! -f "${ARCHIVE_IMAGE_FILE}" ] && ERR "still missing ${DEVICE_IMAGE_FILE}" && return 3
-	return 0
+
+	#
+	# Overlay mount.
+	#
+	${TEAM_BIN_DIR}/${CLI_NAME} overlay mount ${BUILD_DIR} ${ARCHIVE_IMAGE_FILE}; EXIT_CODE=$?
+	[ "0" != "${EXIT_CODE}" ] && ERR "failed to mount overlay fs with ${BUILD_IMAGE}" && return 4
+
+	#
+	# Apply parts.
+	#
+	export PARTS_DIRS=${TEAM_DIR}/parts:${CLI_DIR}/parts
+	${TEAM_BIN_DIR}/${CLI_NAME} apply_parts ${BUILD_DIR} ${BUILD_PARTS_CONF_JSON}; EXIT_CODE=$?
+	unset PARTS_DIRS
+	if [ "0" != "${EXIT_CODE}" ]; then
+		${TEAM_BIN_DIR}/${CLI_NAME} overlay umount ${BUILD_DIR}
+		return 5
+	fi
+
+	#
+	# Compose archive image from directory.
+	#
+	${TEAM_BIN_DIR}/${CLI_NAME} ad2ai ${BUILD_DIR} ${BUILD_IMAGE}; EXIT_CODE=$?
+
+	#
+	# Overlay umount.
+	#
+	${TEAM_BIN_DIR}/${CLI_NAME} overlay umount ${BUILD_DIR}
+	return ${EXIT_CODE}
 }
 
 
