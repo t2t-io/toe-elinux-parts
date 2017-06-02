@@ -26,36 +26,74 @@
 #  - BOARD_PROFILE         abc, def, spider, ...
 #
 #  (Following variables are derived from parent process `emb_apply_parts`)
-#  - AD_BUILD_CONF_JSON=/tmp/xxx.json
-#  - AD_BUILD_WORK_ENV_BASH=/tmp/xxx-20170413223843/partitions/p2/work/apply_parts_20170413223843/env.bash
-#  - AD_BUILD_WORK_ENV_JSON=/tmp/xxx-20170413223843/partitions/p2/work/apply_parts_20170413223843/env.json
+#  - AD_BUILD_CONF_JSON       = /tmp/xxx.json
+#  - AD_BUILD_WORK_ENV_BASH   = /tmp/xxx-20170413223843/partitions/p2/work/apply_parts_20170413223843/env.bash
+#  - AD_BUILD_WORK_ENV_JSON   = /tmp/xxx-20170413223843/partitions/p2/work/apply_parts_20170413223843/env.json
+#  - AD_BUILD_WORK_PARTS_DIR  = /tmp/xxx-20170413223843/partitions/p2/work/apply_parts_20170413223843/parts
+#  - AD_BUILD_WORK_PARTS_FILE = /tmp/xxx-20170413223843/partitions/p2/work/apply_parts_20170413223843/parts.txt
+#
+#  - AD_BUILD_WORK_DEBIAN_PKG_LIST  = /tmp/xxx-20170413223843/partitions/p2/work/apply_parts_20170413223843/package-debian.txt
+#  - AD_BUILD_WORK_PYTHON2_PKG_LIST = /tmp/xxx-20170413223843/partitions/p2/work/apply_parts_20170413223843/package-python2.txt
+#  - AD_BUILD_WORK_PYTHON3_PKG_LIST = /tmp/xxx-20170413223843/partitions/p2/work/apply_parts_20170413223843/package-python3.txt
 #  
-#  - AD_BUILD_WORK_PARTS_DIR=/tmp/xxx-20170413223843/partitions/p2/work/apply_parts_20170413223843/parts
-#  - AD_BUILD_WORK_PARTS_FILE=/tmp/xxx-20170413223843/partitions/p2/work/apply_parts_20170413223843/parts.txt
+#  - AD_BUILD_WORK_TOPDIR    = /tmp/xxx-20170413223843/partitions/p2/work/apply_parts_20170413223843
 #
-#  - AD_BUILD_WORK_DEBIAN_PKG_LIST=/tmp/xxx-20170413223843/partitions/p2/work/apply_parts_20170413223843/package-debian.txt
-#  - AD_BUILD_WORK_PYTHON2_PKG_LIST=/tmp/xxx-20170413223843/partitions/p2/work/apply_parts_20170413223843/package-python2.txt
-#  - AD_BUILD_WORK_PYTHON3_PKG_LIST=/tmp/xxx-20170413223843/partitions/p2/work/apply_parts_20170413223843/package-python3.txt
-#  
-#  - AD_BUILD_WORK_TOPDIR=/tmp/xxx-20170413223843/partitions/p2/work/apply_parts_20170413223843
-#
-#  - AD_CONF_JSON=/tmp/xxx-20170413223843/config.json
-#  - AD_PARTITION_DIR=/tmp/xxx-20170413223843/partitions
-#
-#  - AD_ROOTFS_DIR=/tmp/xxx-20170413223843/partitions/p2
-#  - AD_ROOTFS_METADATA_FILE=/tmp/xxx-20170413223843/rootfs.yaml
-#  - AD_ROOTFS_PARTITION=p2
-#  - AD_ROOTFS_TYPE=bone
-#
-#  - AD_TOPDIR=/tmp/xxx-20170413223843
-#
+#  - AD_TOPDIR               = /tmp/xxx-20170413223843
+#  - AD_CONF_JSON            = /tmp/xxx-20170413223843/config.json
+#  - AD_PARTITION_DIR        = /tmp/xxx-20170413223843/partitions
+#  - AD_ROOTFS_DIR           = /tmp/xxx-20170413223843/partitions/p2
+#  - AD_ROOTFS_METADATA_FILE = /tmp/xxx-20170413223843/rootfs.yaml
+#  - AD_ROOTFS_PARTITION     = p2
+#  - AD_ROOTFS_TYPE          = bone
 # 
+
+
+function repartition_archive_directory {
+	local AD_CONF_JSON_BAK=$(mktemp /tmp/XXXXXX)
+	local OLD_UUID=$(cat ${AD_CONF_JSON} | jq ".partitions.p2.uuid" | sed 's/\"//g')
+	cp ${AD_CONF_JSON} ${AD_CONF_JSON_BAK}
+	cat ${AD_CONF_JSON_BAK} \
+		| jq ".partitions.p1.p_end = \"${TOE2_BASE_P1_END}%\""	\
+		| jq ".partitions.p2.p_start = \"$((TOE2_BASE_P1_END+1))%\""	\
+		| jq ".partitions.p2.p_end = \"${TOE2_BASE_P2_END}%\""	\
+		| jq ".partitions.p2.uuid = \"${TOE2_BASE_P2_UUID}\""	\
+		| jq ".partitions.p3 = {}"	\
+		| jq ".partitions.p3.type = \"ext4\""	\
+		| jq ".partitions.p3.label = \"app\""   \
+		| jq ".partitions.p3.uuid = \"${TOE2_BASE_P3_UUID}\""	\
+		| jq ".partitions.p3.p_start = \"$((TOE2_BASE_P2_END+1))%\""	\
+		| jq ".partitions.p3.p_end = \"${TOE2_BASE_P3_END}%\""	\
+		| jq ".partitions.p4 = {}"	\
+		| jq ".partitions.p4.type = \"ext4\""	\
+		| jq ".partitions.p4.label = \"data\""	\
+		| jq ".partitions.p4.uuid = \"${TOE2_BASE_P4_UUID}\""	\
+		| jq ".partitions.p4.p_start = \"$((TOE2_BASE_P3_END+1))%\""	\
+		| jq ".partitions.p4.p_end = \"100%\""	\
+		> ${AD_CONF_JSON}
+	INFO "after repartitioning to layout-03:"
+	cat ${AD_CONF_JSON} | jq .partitions | awk '{printf "\t%s\n", $0}'
+	rm -f ${AD_CONF_JSON_BAK}
+	rm -f ${AD_TOPDIR}/config.ls
+
+	case "${BOARD_DIST_CODENAME}" in
+		bone)
+			sed -i "s/${OLD_UUID}/${TOE2_BASE_P2_UUID}/g" ${AD_PARTITION_DIR}/p1/uEnv.txt
+			INFO "update uEnv.txt to use new uuid $(PURPLE ${TOE2_BASE_P2_UUID}):"
+			cat ${AD_PARTITION_DIR}/p1/uEnv.txt | awk '{printf "\t%s\n", $0}'
+			;;
+		*)
+			ERR "unsupport BOARD_DIST_CODENAME(${BOARD_DIST_CODENAME}) to modify rootfs' uuid for bootloader"
+			return 2
+			;;
+	esac
+	return 0
+}
 
 
 # Before archive directory is manipulated.
-# 
+#
 function pre_image {
-	return 0
+	repartition_archive_directory || return 1
 }
 
 

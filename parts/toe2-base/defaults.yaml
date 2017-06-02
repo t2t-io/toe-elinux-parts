@@ -1,25 +1,25 @@
+# The end of 1st partition. E.g. MBR ~ 2%.
+#
+P1_END: 2
 
-##
-# Add environment variables with default values when performing 
-# the part hook scripts.
+# The end of 2nd partition. So, the size of P2 is (P1_END + 1)% ~ 25%
 #
-# For example, when you add a variable AAA_BBB in this configuration
-# file under the part with name `xxx-yyy-zzz`. Then, in the hook
-# bash script can use the environment variable XXX_YYY_ZZZ_AAA_BBB.
-#
-# And, this defaults file is an YAML configuration file, which can
-# support primitive types. For example:
-#
-#  AAA: true
-#  BBB: 12
-#  CCC: goodbye
-#
-# The value of `CCC` variable is treated as a string, so you don't
-# need "goodbye" with quote. For more details, please refer to 
-# YAML specification.
-#
+P2_END: 25
 
-#AAA: true
-#BBB: 12
-#CCC: goodbye
-#DDD: https://en.wikipedia.org/
+# The end of 3rd partition.
+#   - the size of P3 shall be (P2_END + 1)% ~ 50%
+#   - the size of P4 shall be (P3_END + 1)% ~ 100%
+#
+P3_END: 50
+
+# The uuid of the 2nd partition.
+#
+P2_UUID: a133d941-eea3-4933-beee-5885a40c1959
+
+# The uuid of 3rd partition.
+#
+P3_UUID: 3c25d678-e2c6-4b36-b036-9ef6b944a6d5
+
+# The uuid of 4th partition.
+#
+P4_UUID: 490f9fb6-bcca-434e-b582-4db332934aab
