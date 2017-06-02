@@ -3,8 +3,8 @@
 name: {{BUILD_BOARD_PROFILE}}
 
 parts:
-    - toe-base
-    - toe-{{BUILD_TEAM_NAME}}-base
+    - toe2-base
+    - toe2-{{BUILD_TEAM_NAME}}-base
 
 envs:
     # Possible values: `bbg`, `bbgw`, `piz`, `pizw`, `pi2`, `pi3`
