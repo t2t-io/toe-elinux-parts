@@ -1,0 +1,79 @@
+#!/bin/bash
+#
+
+function LIGHT_GREEN {
+	COLOR='\033[1;32m'
+	NC='\033[0m'
+	echo "${COLOR}$@${NC}"
+}
+
+function PURPLE {
+	COLOR='\033[0;35m'
+	NC='\033[0m'
+	echo "${COLOR}$@${NC}"
+}
+
+function DBG {
+	echo -e "$(date '+%H:%M:%S') [ye] $@\r"
+}
+
+function RUN_CMD_RAW {
+	DBG "\t$(PURPLE $@)"
+	$@
+}
+
+function RUN_CMD {
+	DBG "\t$(PURPLE $@)"
+	TMP=$(mktemp /tmp/XXXXXX)
+	$@ > ${TMP} 2>&1
+	[ "0" != "$?" ] && cat ${TMP}
+	rm -f ${TMP}
+}
+
+function get_ys_config {
+	cat /etc/ys.conf | grep "^$1" | awk -F'\t' '{print $2}'
+}
+
+function init_variables {
+	export OS_PARTITION_SYS_ID=$(get_ys_config OS_PARTITION_SYS_ID)
+	export OS_PARTITION_APP_ID=$(get_ys_config OS_PARTITION_APP_ID)
+	export OS_PARTITION_DAT_ID=$(get_ys_config OS_PARTITION_DAT_ID)
+	export OS_NAME=$(get-ys-config OS_NAME)
+	export YS_DIR=$(get-ys-config YS_DIR)
+	export YS_APTKEYS_DIR=$(get-ys-config YS_APTKEYS_DIR)
+	export YS_FIRSTBOOT="${YS_DIR}/.firstboot"
+	export YS_APP_DIR="/mnt/app"
+	export YS_DAT_DIR="/mnt/data"
+	DBG "OS_PARTITION_SYS_ID = $(LIGHT_GREEN ${OS_PARTITION_SYS_ID})"
+	DBG "OS_PARTITION_APP_ID = $(LIGHT_GREEN ${OS_PARTITION_APP_ID})"
+	DBG "OS_PARTITION_DAT_ID = $(LIGHT_GREEN ${OS_PARTITION_DAT_ID})"
+	DBG "YS_APP_DIR = $(LIGHT_GREEN ${YS_APP_DIR})"
+	DBG "YS_DAT_DIR = $(LIGHT_GREEN ${YS_DAT_DIR})"
+	DBG "YS_DIR = $(LIGHT_GREEN ${YS_DIR})"
+	DBG "YS_FIRSTBOOT = $(LIGHT_GREEN ${YS_FIRSTBOOT})"
+}
+
+function mount-partition-and-dir {
+	DBG "$(LIGHT_GREEN 'mount partitions and directories')"
+	RUN_CMD mkdir -p ${YS_APP_DIR}
+	RUN_CMD mkdir -p ${YS_DAT_DIR}
+	DRV=$(mount | grep -v none | grep ext4 | head -n1 | awk '{print $1}' | sed 's/.$//g')
+	RUN_CMD mount -t ext4 ${DRV}${OS_PARTITION_APP_ID} ${YS_APP_DIR}
+	RUN_CMD mount -t ext4 ${DRV}${OS_PARTITION_DAT_ID} ${YS_DAT_DIR}
+	RUN_CMD mkdir -p /opt/ttt
+	RUN_CMD mkdir -p /opt/yapps-scripts
+	# RUN_CMD mount -o bind ${YS_APP_DIR}/opt/ttt /opt/ttt
+	RUN_CMD mount -o bind ${YS_APP_DIR}/yapps-scripts /opt/yapps-scripts
+}
+
+init-variables
+mount-partition-and-dir
+
+
+DBG "PATH = $(LIGHT_GREEN ${PATH})"
+
+# Call to yac script to boot yapps.
+#
+DBG "running $(LIGHT_GREEN 'yac boot') in the background"
+PATH=$(cat /etc/environment | grep "^PATH=" | awk -F'=' '{print $2}' | sed 's/\"//g') LOG_LINE_END="\r" yac boot &
+
