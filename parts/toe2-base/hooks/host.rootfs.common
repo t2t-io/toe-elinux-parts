@@ -1,0 +1,180 @@
+#!/bin/bash
+#
+
+# Here are variables initiated by load_and_run script:
+#
+#  - PART_NAME
+#  - PART_DIR
+#
+# Here are variables initiated by apply_parts command,
+# stored in ${WORK_DIR}/env.bash
+# 
+#  - CLI_DIR
+#  - ELINUX_TOOLS_DIR
+#
+#  (Following variables are retrieved from ${ARCHIVE_DIR}/rootfs.yaml)
+#  - BOARD_DIST_CODENAME   bone, raspbian, ...
+#  - DIST_CODENAME         trusty, jessie, ...
+#  - DIST_NAME             ubuntu, debian, ...
+#  - KERNEL_ARCHITECTURE   armv7l
+#  - KERNEL                linux
+#  - KERNEL_VERSION        4.1.17-ti-rt-r47
+#
+#  (Following variables are retrieved from the config.json passed to apply_parts subcommand, all are optional)
+#  - BOARD_NAME            bbgw, bbg, piz, pizw, ...
+#  - BOARD_ENV             production, testing, development, ...
+#  - BOARD_PROFILE         abc, def, spider, ...
+#
+#  (Following variables are derived from parent process `emb_apply_parts`)
+#  - AD_BUILD_CONF_JSON       = /tmp/xxx.json
+#  - AD_BUILD_WORK_ENV_BASH   = /tmp/xxx-20170413223843/partitions/p2/work/apply_parts_20170413223843/env.bash
+#  - AD_BUILD_WORK_ENV_JSON   = /tmp/xxx-20170413223843/partitions/p2/work/apply_parts_20170413223843/env.json
+#  - AD_BUILD_WORK_PARTS_DIR  = /tmp/xxx-20170413223843/partitions/p2/work/apply_parts_20170413223843/parts
+#  - AD_BUILD_WORK_PARTS_FILE = /tmp/xxx-20170413223843/partitions/p2/work/apply_parts_20170413223843/parts.txt
+#
+#  - AD_BUILD_WORK_DEBIAN_PKG_LIST  = /tmp/xxx-20170413223843/partitions/p2/work/apply_parts_20170413223843/package-debian.txt
+#  - AD_BUILD_WORK_PYTHON2_PKG_LIST = /tmp/xxx-20170413223843/partitions/p2/work/apply_parts_20170413223843/package-python2.txt
+#  - AD_BUILD_WORK_PYTHON3_PKG_LIST = /tmp/xxx-20170413223843/partitions/p2/work/apply_parts_20170413223843/package-python3.txt
+#  
+#  - AD_BUILD_WORK_TOPDIR    = /tmp/xxx-20170413223843/partitions/p2/work/apply_parts_20170413223843
+#
+#  - AD_TOPDIR               = /tmp/xxx-20170413223843
+#  - AD_CONF_JSON            = /tmp/xxx-20170413223843/config.json
+#  - AD_PARTITION_DIR        = /tmp/xxx-20170413223843/partitions
+#  - AD_ROOTFS_DIR           = /tmp/xxx-20170413223843/partitions/p2
+#  - AD_ROOTFS_METADATA_FILE = /tmp/xxx-20170413223843/rootfs.yaml
+#  - AD_ROOTFS_PARTITION     = p2
+#  - AD_ROOTFS_TYPE          = bone
+# 
+
+function generate_file_for_build_information {
+cat <<__EOF__
+# 
+# Built-At: $(date '+%Y/%m/%d %H:%M')
+# Built-By: $(whoami)
+# Built-With: ${PART_NAME}
+#
+BOARD: ${BOARD_NAME}
+BOARD_PROFILE: ${BOARD_PROFILE}
+BOARD_ENV: ${BOARD_ENV}
+
+##
+## (Deprecated)
+##
+## BOARD_TIMEZONE: ${BOARD_TIMEZONE}
+__EOF__
+}
+
+
+function generate_file_for_ys_conf {
+cat << __EOF__
+OS_PARTITION_SYS_ID	${TOE2_BASE_PARTITION_ID_ROOTFS}
+OS_PARTITION_APP_ID	${TOE2_BASE_PARTITION_ID_APP}
+OS_PARTITION_DAT_ID	${TOE2_BASE_PARTITION_ID_DATA}
+OS_NAME	${KERNEL}-${DIST_NAME}-${DIST_CODENAME}
+OS_ARCH	${KERNEL_ARCHITECTURE}
+OS_IMAGE	${BOARD_IMAGE_URL}
+OS_SCRIPT_REV	${BOARD_IMAGE_SCRIPT_REVISION}
+BOARD	${BOARD_NAME}
+PROFILE	${BOARD_PROFILE}
+ENV	${BOARD_ENV}
+YS_DIR	${TOE2_BASE_YAPPS_SCRIPTS_DATA_DIR}
+
+##
+## (Deprecated)
+##
+## YS_APTKEYS_DIR	${BOARD_YS_APTKEYS_DIR}
+__EOF__
+}
+
+
+function generate_file_for_profile_conf {
+echo "PROFILE = ${BOARD_PROFILE}"
+}
+
+
+function update_git_dir {
+	local VAR_NAME=$1
+	[ "" == "${VAR_NAME}" ] && ERR "missing VAR_NAME" && return 1
+	local DST_PATH=$(read_part_variable ${VAR_NAME})
+	[ "" == "${DST_PATH}" ] && ERR "missing DST_PATH" && return 2
+	local DST_FULLPATH="${AD_ROOTFS_DIR}${DST_PATH}"
+	[ ! -d "${DST_FULLPATH}" ]      && ERR "missing directory ${DST_FULLPATH} to update git" && return 3
+	[ ! -d "${DST_FULLPATH}/.git" ] && ERR "missing directory ${DST_FULLPATH}/.git to update git" && return 4
+	local TMP_DIR=$(pwd)
+	cd ${DST_FULLPATH}
+	git pull || return 3
+	cd ${TMP_DIR}
+	return 0
+}
+
+
+function update_hostname {
+	local DST_FILE="${AD_ROOTFS_DIR}/etc/hostname"
+	run_my_cmd "echo ${DEFAULT_HOSTNAME} > ${DST_FILE}"
+	show_rootfs_file /etc/hostname
+}
+
+
+function update_hosts {
+	local DST_FILE="${AD_ROOTFS_DIR}/etc/hosts"
+	run_my_cmd "sed -i \"s/^127.0.1.1.*/127.0.1.1\t${DEFAULT_HOSTNAME} ${DEFAULT_HOSTNAME}.localdomain/g\" ${DST_FILE}"
+	show_rootfs_file /etc/hosts
+}
+
+
+function attach_to_init_process {
+	local DST_FILE="${AD_ROOTFS_DIR}/etc/rc.local"
+	run_my_cmd "sed -i \"s/^exit.*//g\" ${DST_FILE}"
+	echo '[ -f "${BASH_SOURCE[0]}" ] && $BASH ${BASH_SOURCE[0]}' >> ${DST_FILE}
+	echo 'exit 0' >> ${DST_FILE}
+	show_rootfs_file /etc/rc.local
+}
+
+
+function append_path_variable {
+	local DST_FILE="${AD_ROOTFS_DIR}/etc/environment"
+	local TMP_FILE=$(mktemp /tmp/XXXXXX)
+	echo "/opt/yapps-scripts/bin" >> ${TMP_FILE}
+	cat ${DST_FILE} | grep "^PATH" | awk -F'=' '{print $2}' | sed 's/\"//g' | tr ':' '\n' >> ${TMP_FILE}
+	sed -i 's/^PATH\=.*//g' ${DST_FILE}
+	local P=$(cat ${TMP_FILE} | tr '\n' ':' | sed 's/\:$//g')
+	echo "PATH=\"${P}\"" >> ${DST_FILE}
+	rm -f ${TMP_FILE}
+	INFO "PATH = $(GREEN ${P})"
+	show_rootfs_file /etc/environment
+}
+
+
+function append_etc_environment {
+	local DST_FILE="${AD_ROOTFS_DIR}/etc/environment"
+cat << __EOF__ >> ${DST_FILE}
+YS_DIR=${TOE2_BASE_YAPPS_SCRIPTS_DATA_DIR}
+YAC_DIR=${TOE2_BASE_YAPPS_SCRIPTS_SRC_DIR}
+BOARD=${BOARD_NAME}
+BOARD_PROFILE=${BOARD_PROFILE}
+USE_NODE_VERSION_CACHE=true
+BASHRC_EXTRA=${TOE2_BASE_YAPPS_SCRIPTS_SRC_DIR}/.bashrc
+__EOF__
+	show_rootfs_file /etc/environment
+}
+
+
+function update_dotfiles {
+	update_git_dir YAGAMY_DOTFILES_DIR
+}
+
+
+function host_rootfs_common_entry {
+	export DEFAULT_HOSTNAME="r0"
+	compose_file "build_information"  YAPPS_DATA_FILE_BUILD_INFO || return 1
+	compose_file "ys_conf"            YAPPS_SCRIPTS_CONF || return 1
+	compose_file "profile_conf"       YAPPS_PROFILE_CONF || return 1
+	attach_to_init_process || return 1
+	append_path_variable || return 1
+	append_etc_environment || return 1
+	update_hostname || return 1
+	update_hosts || return 1
+	update_dotfiles || return 1
+	return 0
+}
