@@ -42,7 +42,7 @@ Here are supported ENVs:
 $(read_without_comments ${CLI_RESOURCE_DIR}/envs.conf | awk '{printf "\t- %s\n", $0}')
 
 Here are additional environment variables to change build behaviors:
-	BOARD_IMAGE_URL
+	IMAGE_URL
 		The url to download archive image (e.g. xxx.sqfs.xz) as base image to build.
 		When the url is not specified, the ${CLI_ACTION} subcommand shall call
 		${TEAM_RESOURCE_DIR}/pick-image with PROFILE/BOARD/ENV to pick up a proper
@@ -74,9 +74,11 @@ function initiate_build_variables {
 	local CURRENT=$(pwd)      ; cd $(dirname $0)
 	export TEAM_BIN_DIR=$(pwd); cd ..
 	export TEAM_DIR=$(pwd)    ; cd ${CURRENT}
+	[ "${CLI_DIR}" == "${TEAM_DIR}" ] && ERR "${CLI_NAME} ${CLI_ACTION} shall be executed in team directory, instead of current ${CLI_DIR}" && return 1
 
 	export TEAM_EXTERNAL_DIR="${TEAM_DIR}/externals"
 	export TEAM_RESOURCE_DIR="${TEAM_DIR}/resources"
+	export TEAM_DIR_SCRIPT_REV=$(cat ${TEAM_DIR}/.git/refs/heads/master)
 	export TEAM_FULLNAME=$(basename ${TEAM_DIR})
 	export TEAM_NAME=$(echo ${TEAM_FULLNAME} | tr '-' '\n' | tail -n1)
 
@@ -101,16 +103,17 @@ function initiate_build_variables {
 	export OUTPUT_DIR="/tmp"
 	export BUILD_PARTS_CONF_JSON="${OUTPUT_DIR}/${BUILD_NAME}.json"
 
-	if [ "" == "${BOARD_IMAGE_URL}" ]; then
-		export BOARD_IMAGE_URL=$(${TEAM_RESOURCE_DIR}/pick-image ${BUILD_BOARD_PROFILE} ${BUILD_BOARD_NAME} ${BUILD_BOARD_ENV})
+	export BUILD_BOARD_IMAGE_URL=${IMAGE_URL}
+	if [ "" == "${BUILD_BOARD_IMAGE_URL}" ]; then
+		export BUILD_BOARD_IMAGE_URL=$(${TEAM_RESOURCE_DIR}/pick-image ${BUILD_BOARD_PROFILE} ${BUILD_BOARD_NAME} ${BUILD_BOARD_ENV})
 		[ "0" != "$?" ] && ERR "cannot find image url for ${BUILD_BOARD_PROFILE}/${BUILD_BOARD_NAME}/${BUILD_BOARD_ENV}" && return 1
-		[ "" == "${BOARD_IMAGE_URL}" ] && ERR "unexpected empty image url for ${BUILD_BOARD_PROFILE}/${BUILD_BOARD_NAME}/${BUILD_BOARD_ENV}" && return 1
+		[ "" == "${BUILD_BOARD_IMAGE_URL}" ] && ERR "unexpected empty image url for ${BUILD_BOARD_PROFILE}/${BUILD_BOARD_NAME}/${BUILD_BOARD_ENV}" && return 1
 	fi
 
-	INFO "BUILD_BOARD_PROFILE = ${BUILD_BOARD_PROFILE}"
-	INFO "BUILD_BOARD_NAME    = ${BUILD_BOARD_NAME}"
-	INFO "BUILD_BOARD_ENV     = ${BUILD_BOARD_ENV}"
-	INFO "BOARD_IMAGE_URL     = ${BOARD_IMAGE_URL}"
+	INFO "BUILD_BOARD_PROFILE   = ${BUILD_BOARD_PROFILE}"
+	INFO "BUILD_BOARD_NAME      = ${BUILD_BOARD_NAME}"
+	INFO "BUILD_BOARD_ENV       = ${BUILD_BOARD_ENV}"
+	INFO "BUILD_BOARD_IMAGE_URL = ${BUILD_BOARD_IMAGE_URL}"
 
 	export TRANSFORM="${TEAM_EXTERNAL_DIR}/elinux-tools/tools/transform.js"
 	local EXIT_CODE="0"
@@ -126,7 +129,7 @@ function initiate_build_variables {
 
 
 function download_and_build {
-	local DOWNLOAD_URL=${BOARD_IMAGE_URL}
+	local DOWNLOAD_URL=${BUILD_BOARD_IMAGE_URL}
 	local FILENAME=$(basename ${DOWNLOAD_URL})
 	local NAME=${FILENAME%.*}
 	local DOWNLOAD_FILE="${CACHE_DIR}/${FILENAME}"

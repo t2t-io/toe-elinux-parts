@@ -19,6 +19,17 @@ envs:
     #
     board_profile: {{BUILD_BOARD_PROFILE}}
 
+    # Collect the git revision information for all script directories:
+    #   - TEAM_DIR
+    #   - toe-elinux-parts (`CLI_DIR`)
+    #   - elinux-tools
+    #
+    board_image_script_revision: {{TEAM_NAME}}@{{TEAM_DIR_SCRIPT_REV}}
+
+    # The URL to download the archive image to build.
+    #
+    board_image_url: {{BUILD_BOARD_IMAGE_URL}}
+
 
 configs:
     elinux-common:

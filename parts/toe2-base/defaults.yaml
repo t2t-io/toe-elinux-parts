@@ -23,3 +23,32 @@ P3_UUID: 3c25d678-e2c6-4b36-b036-9ef6b944a6d5
 # The uuid of 4th partition.
 #
 P4_UUID: 490f9fb6-bcca-434e-b582-4db332934aab
+
+
+# The partition number for rootfs, app, and data.
+# PLEASE DO NOT MODIFY IT!!!
+#
+PARTITION_ID_ROOTFS: 2
+PARTITION_ID_APP: 3
+PARTITION_ID_DATA: 4
+
+
+#
+# The directory to store the repository `yapps-scripts` 
+# (https://github.com/yagamy4680/yapps-scripts).
+#
+YAPPS_SCRIPTS_SRC_DIR: /opt/yapps-scripts
+
+
+#
+# The directory to store data/configuration files used by 
+# repository `yapps-scripts`.
+#
+YAPPS_SCRIPTS_DATA_DIR: /opt/ys
+
+
+#
+# The configuration file for `/etc/rc.local.yac` and `yac boot`
+# to load.
+#
+YAPPS_SCRIPTS_CONF: /etc/ys.conf

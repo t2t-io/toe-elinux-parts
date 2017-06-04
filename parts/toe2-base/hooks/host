@@ -21,7 +21,7 @@
 #  - KERNEL_VERSION        4.1.17-ti-rt-r47
 #
 #  (Following variables are retrieved from the config.json passed to apply_parts subcommand, all are optional)
-#  - BOARD                 bbgw, bbg, piz, pizw, ...
+#  - BOARD_NAME            bbgw, bbg, piz, pizw, ...
 #  - BOARD_ENV             production, testing, development, ...
 #  - BOARD_PROFILE         abc, def, spider, ...
 #
@@ -90,6 +90,57 @@ function repartition_archive_directory {
 }
 
 
+function generate_file_for_build_information {
+cat <<__EOF__
+# 
+# Built-At: $(date '+%Y/%m/%d %H:%M')
+# Built-By: $(whoami)
+# Built-With: $(PART_NAME)
+#
+BOARD: ${BOARD_NAME}
+BOARD_PROFILE: ${BOARD_PROFILE}
+BOARD_ENV: ${BOARD_ENV}
+
+##
+## (Deprecated)
+##
+## BOARD_TIMEZONE: ${BOARD_TIMEZONE}
+__EOF__
+}
+
+
+function generate_file_for_ys_conf {
+cat << __EOF__
+OS_PARTITION_SYS_ID	${TOE2_BASE_PARTITION_ID_ROOTFS}
+OS_PARTITION_APP_ID	${TOE2_BASE_PARTITION_ID_APP}
+OS_PARTITION_DAT_ID	${TOE2_BASE_PARTITION_ID_DATA}
+OS_NAME	${KERNEL}-${DIST_NAME}-${DIST_CODENAME}
+OS_ARCH	${KERNEL_ARCHITECTURE}
+OS_IMAGE	${BOARD_IMAGE_URL}
+OS_SCRIPT_REV	${BOARD_IMAGE_SCRIPT_REVISION}
+BOARD	${BOARD_NAME}
+PROFILE	${BOARD_PROFILE}
+ENV	${BOARD_ENV}
+YS_DIR	${TOE2_BASE_YAPPS_SCRIPTS_DATA_DIR}
+
+##
+## (Deprecated)
+##
+## YS_APTKEYS_DIR	${BOARD_YS_APTKEYS_DIR}
+__EOF__
+}
+
+function compose_file {
+	local NAME=$1
+	local FILE=$2
+	[ "" == "${NAME}" ] && return 1
+	[ "" == "${FILE}" ] && return 2
+	mkdir -p $(dirname ${FILE}) || return 3
+	generate_file_for_${NAME} > $2 || return 4
+	INFO "$(PURPLE $1) ($(GRAY $2))" && cat $2 | awk '{printf "\t%s\n", $0}'
+}
+
+
 # Before archive directory is manipulated.
 #
 function pre_image {
@@ -109,6 +160,9 @@ function pre_image {
 # Before running script inside rootfs with chroot and qemu (guest script).
 #
 function pre_guest {
+	local YS_DIR=${TOE2_BASE_YAPPS_SCRIPTS_DATA_DIR}
+	compose_file "build_information"  "${AD_ROOTFS_DIR}${YS_DIR}/yapps-env.build.txt"   || return 1
+	compose_file "ys_conf"            "${AD_ROOTFS_DIR}${TOE2_BASE_YAPPS_SCRIPTS_CONF}" || return 1
 	return 0
 }
 
