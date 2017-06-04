@@ -46,6 +46,11 @@ YAPPS_SCRIPTS_SRC_DIR: /opt/yapps-scripts
 #
 YAPPS_SCRIPTS_DATA_DIR: /opt/ys
 
+#
+# Data Files in {{YAPPS_SCRIPTS_DATA_DIR}}
+#
+YAPPS_DATA_FILE_BUILD_INFO: /opt/ys/yapps-env.build.txt
+
 
 #
 # The configuration file for `/etc/rc.local.yac` and `yac boot`
@@ -58,3 +63,9 @@ YAPPS_SCRIPTS_CONF: /etc/ys.conf
 # the profile {{BOARD_PROFILE}}.
 #
 YAPPS_PROFILE_CONF: /etc/ttt.conf
+
+
+#
+# The dotfiles.
+#
+YAGAMY_DOTFILES_DIR: /opt/dotfiles

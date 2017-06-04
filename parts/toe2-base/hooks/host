@@ -136,14 +136,41 @@ echo "PROFILE = ${BOARD_PROFILE}"
 }
 
 
-function compose_file {
+function read_part_variable {
 	local NAME=$1
-	local FILE=$2
-	[ "" == "${NAME}" ] && return 1
-	[ "" == "${FILE}" ] && return 2
-	mkdir -p $(dirname ${FILE}) || return 3
-	generate_file_for_${NAME} > $2 || return 4
-	INFO "$(PURPLE $1) ($(GRAY $2))" && cat $2 | awk '{printf "\t%s\n", $0}'
+	local PART_UPPERCASE_NAME=$(echo ${PART_NAME} | tr '[a-z]' '[A-Z]' | tr '-' '_')
+	local VARIABLE_NAME="${PART_UPPERCASE_NAME}_${NAME}"
+	echo ${!VARIABLE_NAME}
+}
+
+
+function compose_file {
+	local FUNC_NAME=$1
+	local FILE_NAME=$2
+	[ "" == "${FUNC_NAME}" ] && ERR "missing FUNC_NAME" && return 1
+	[ "" == "${FILE_NAME}" ] && ERR "missing FILE_NAME" && return 2
+	local FILE_PATH=$(read_part_variable ${FILE_NAME})
+	[ "" == "${FILE_PATH}" ] && ERR "missing FILE_PATH" && return 3
+	local FILE_FULLPATH="${AD_ROOTFS_DIR}${FILE_PATH}"
+	mkdir -p $(dirname ${FILE_FULLPATH}) || return 4
+	generate_file_for_${FUNC_NAME} > ${FILE_FULLPATH} || return 5
+	INFO "$(PURPLE ${FUNC_NAME}) ($(GRAY ${FILE_PATH}))" && cat ${FILE_FULLPATH} | awk '{printf "\t%s\n", $0}'
+}
+
+
+function update_git_dir {
+	local VAR_NAME=$1
+	[ "" == "${VAR_NAME}" ] && ERR "missing VAR_NAME" && return 1
+	local DST_PATH=$(read_part_variable ${VAR_NAME})
+	[ "" == "${DST_PATH}" ] && ERR "missing DST_PATH" && return 2
+	local DST_FULLPATH="${AD_ROOTFS_DIR}${DST_PATH}"
+	[ ! -d "${DST_FULLPATH}" ]      && ERR "missing directory ${DST_FULLPATH} to update git" && return 3
+	[ ! -d "${DST_FULLPATH}/.git" ] && ERR "missing directory ${DST_FULLPATH}/.git to update git" && return 4
+	local TMP_DIR=$(pwd)
+	cd ${DST_FULLPATH}
+	git pull || return 3
+	cd ${TMP_DIR}
+	return 0
 }
 
 
@@ -204,6 +231,11 @@ __EOF__
 }
 
 
+function update_dotfiles {
+	update_git_dir YAGAMY_DOTFILES_DIR
+}
+
+
 # Before archive directory is manipulated.
 #
 function pre_image {
@@ -224,15 +256,15 @@ function pre_image {
 #
 function pre_guest {
 	export DEFAULT_HOSTNAME="r0"
-	local YS_DIR=${TOE2_BASE_YAPPS_SCRIPTS_DATA_DIR}
-	compose_file "build_information"  "${AD_ROOTFS_DIR}${YS_DIR}/yapps-env.build.txt"   || return 1
-	compose_file "ys_conf"            "${AD_ROOTFS_DIR}${TOE2_BASE_YAPPS_SCRIPTS_CONF}" || return 1
-	compose_file "profile_conf"       "${AD_ROOTFS_DIR}${TOE2_BASE_YAPPS_PROFILE_CONF}" || return 1
+	compose_file "build_information"  YAPPS_DATA_FILE_BUILD_INFO || return 1
+	compose_file "ys_conf"            YAPPS_SCRIPTS_CONF || return 1
+	compose_file "profile_conf"       YAPPS_PROFILE_CONF || return 1
 	attach_to_init_process || return 1
 	append_path_variable || return 1
 	append_etc_environment || return 1
 	update_hostname || return 1
 	update_hosts || return 1
+	update_dotfiles || return 1
 	return 0
 }
 
