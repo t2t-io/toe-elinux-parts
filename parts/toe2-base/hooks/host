@@ -131,6 +131,11 @@ __EOF__
 }
 
 
+function generate_file_for_profile_conf {
+echo "PROFILE = ${BOARD_PROFILE}"
+}
+
+
 function compose_file {
 	local NAME=$1
 	local FILE=$2
@@ -149,19 +154,53 @@ function show_rootfs_file {
 
 
 function update_hostname {
-	local DEFAULT_HOSTNAME="r0"
-	run_my_cmd "echo ${DEFAULT_HOSTNAME} > ${AD_ROOTFS_DIR}/etc/hostname"
-	run_my_cmd "sed -i \"s/^127.0.1.1.*/127.0.1.1\t${DEFAULT_HOSTNAME} ${DEFAULT_HOSTNAME}.localdomain/g\" ${AD_ROOTFS_DIR}/etc/hosts"
+	local DST_FILE="${AD_ROOTFS_DIR}/etc/hostname"
+	run_my_cmd "echo ${DEFAULT_HOSTNAME} > ${DST_FILE}"
 	show_rootfs_file /etc/hostname
+}
+
+
+function update_hosts {
+	local DST_FILE="${AD_ROOTFS_DIR}/etc/hosts"
+	run_my_cmd "sed -i \"s/^127.0.1.1.*/127.0.1.1\t${DEFAULT_HOSTNAME} ${DEFAULT_HOSTNAME}.localdomain/g\" ${DST_FILE}"
 	show_rootfs_file /etc/hosts
 }
 
 
 function attach_to_init_process {
-	run_my_cmd "sed -i \"s/^exit.*//g\" ${AD_ROOTFS_DIR}/etc/rc.local"
-	echo '[ -f "${BASH_SOURCE[0]}" ] && $BASH ${BASH_SOURCE[0]}' >> ${AD_ROOTFS_DIR}/etc/rc.local
-	echo 'exit 0' >> ${AD_ROOTFS_DIR}/etc/rc.local
+	local DST_FILE="${AD_ROOTFS_DIR}/etc/rc.local"
+	run_my_cmd "sed -i \"s/^exit.*//g\" ${DST_FILE}"
+	echo '[ -f "${BASH_SOURCE[0]}" ] && $BASH ${BASH_SOURCE[0]}' >> ${DST_FILE}
+	echo 'exit 0' >> ${DST_FILE}
 	show_rootfs_file /etc/rc.local
+}
+
+
+function append_path_variable {
+	local DST_FILE="${AD_ROOTFS_DIR}/etc/environment"
+	local TMP_FILE=$(mktemp /tmp/XXXXXX)
+	echo "/opt/yapps-scripts/bin" >> ${TMP_FILE}
+	cat ${DST_FILE} | grep "^PATH" | awk -F'=' '{print $2}' | sed 's/\"//g' | tr ':' '\n' >> ${TMP_FILE}
+	sed -i 's/^PATH\=.*//g' ${DST_FILE}
+	local P=$(cat ${TMP_FILE} | tr '\n' ':' | sed 's/\:$//g')
+	echo "PATH=\"${P}\"" >> ${DST_FILE}
+	rm -f ${TMP_FILE}
+	INFO "PATH = $(GREEN ${P})"
+	show_rootfs_file /etc/environment
+}
+
+
+function append_etc_environment {
+	local DST_FILE="${AD_ROOTFS_DIR}/etc/environment"
+cat << __EOF__ >> ${DST_FILE}
+YS_DIR=${TOE2_BASE_YAPPS_SCRIPTS_DATA_DIR}
+YAC_DIR=${TOE2_BASE_YAPPS_SCRIPTS_SRC_DIR}
+BOARD=${BOARD_NAME}
+BOARD_PROFILE=${BOARD_PROFILE}
+USE_NODE_VERSION_CACHE=true
+BASHRC_EXTRA=${TOE2_BASE_YAPPS_SCRIPTS_SRC_DIR}/.bashrc
+__EOF__
+	show_rootfs_file /etc/environment
 }
 
 
@@ -184,11 +223,16 @@ function pre_image {
 # Before running script inside rootfs with chroot and qemu (guest script).
 #
 function pre_guest {
+	export DEFAULT_HOSTNAME="r0"
 	local YS_DIR=${TOE2_BASE_YAPPS_SCRIPTS_DATA_DIR}
 	compose_file "build_information"  "${AD_ROOTFS_DIR}${YS_DIR}/yapps-env.build.txt"   || return 1
 	compose_file "ys_conf"            "${AD_ROOTFS_DIR}${TOE2_BASE_YAPPS_SCRIPTS_CONF}" || return 1
+	compose_file "profile_conf"       "${AD_ROOTFS_DIR}${TOE2_BASE_YAPPS_PROFILE_CONF}" || return 1
 	attach_to_init_process || return 1
+	append_path_variable || return 1
+	append_etc_environment || return 1
 	update_hostname || return 1
+	update_hosts || return 1
 	return 0
 }
 

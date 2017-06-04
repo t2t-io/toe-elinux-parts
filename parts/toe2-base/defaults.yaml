@@ -52,3 +52,9 @@ YAPPS_SCRIPTS_DATA_DIR: /opt/ys
 # to load.
 #
 YAPPS_SCRIPTS_CONF: /etc/ys.conf
+
+
+#
+# the profile {{BOARD_PROFILE}}.
+#
+YAPPS_PROFILE_CONF: /etc/ttt.conf
