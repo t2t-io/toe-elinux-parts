@@ -130,6 +130,7 @@ YS_DIR	${TOE2_BASE_YAPPS_SCRIPTS_DATA_DIR}
 __EOF__
 }
 
+
 function compose_file {
 	local NAME=$1
 	local FILE=$2
@@ -138,6 +139,29 @@ function compose_file {
 	mkdir -p $(dirname ${FILE}) || return 3
 	generate_file_for_${NAME} > $2 || return 4
 	INFO "$(PURPLE $1) ($(GRAY $2))" && cat $2 | awk '{printf "\t%s\n", $0}'
+}
+
+
+function show_rootfs_file {
+	INFO "$(PURPLE $1) ($(GRAY ${AD_ROOTFS_DIR}$1))"
+	cat ${AD_ROOTFS_DIR}$1 | awk '{printf "\t%s\n", $0}'
+}
+
+
+function update_hostname {
+	local DEFAULT_HOSTNAME="r0"
+	run_my_cmd "echo ${DEFAULT_HOSTNAME} > ${AD_ROOTFS_DIR}/etc/hostname"
+	run_my_cmd "sed -i \"s/^127.0.1.1.*/127.0.1.1\t${DEFAULT_HOSTNAME} ${DEFAULT_HOSTNAME}.localdomain/g\" ${AD_ROOTFS_DIR}/etc/hosts"
+	show_rootfs_file /etc/hostname
+	show_rootfs_file /etc/hosts
+}
+
+
+function attach_to_init_process {
+	run_my_cmd "sed -i \"s/^exit.*//g\" ${AD_ROOTFS_DIR}/etc/rc.local"
+	echo '[ -f "${BASH_SOURCE[0]}" ] && $BASH ${BASH_SOURCE[0]}' >> ${AD_ROOTFS_DIR}/etc/rc.local
+	echo 'exit 0' >> ${AD_ROOTFS_DIR}/etc/rc.local
+	show_rootfs_file /etc/rc.local
 }
 
 
@@ -163,6 +187,8 @@ function pre_guest {
 	local YS_DIR=${TOE2_BASE_YAPPS_SCRIPTS_DATA_DIR}
 	compose_file "build_information"  "${AD_ROOTFS_DIR}${YS_DIR}/yapps-env.build.txt"   || return 1
 	compose_file "ys_conf"            "${AD_ROOTFS_DIR}${TOE2_BASE_YAPPS_SCRIPTS_CONF}" || return 1
+	attach_to_init_process || return 1
+	update_hostname || return 1
 	return 0
 }
 
