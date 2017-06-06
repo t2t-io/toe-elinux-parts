@@ -123,12 +123,96 @@ function load_script_and_run {
 	[ "" == "${TYPE}" ] && ERR "missing TYPE" && return 1
 	local NAME=$1; shift
 	[ "" == "${NAME}" ] && ERR "missing NAME" && return 2
+	local OPTIONAL=$1; shift
+	[ "" == "${OPTIONAL}" ] && local OPTIONAL="false"
+	[ "true" == "${OPTIONAL}" ] && local NON_EXISTING_ERR="0" || local NON_EXISTING_ERR="3"
 	local SCRIPT_FILE="${BASH_SOURCE[0]}.${TYPE}.${NAME}"
-	[ ! -f "${SCRIPT_FILE}" ] && ERR "no such file to load: ${SCRIPT_FILE}" && return 3
+	[ ! -f "${SCRIPT_FILE}" ] && ERR "no such file to load: ${SCRIPT_FILE}" && return ${NON_EXISTING_ERR}
 	source ${SCRIPT_FILE} || return 4
 	local FUNC_NAME="$(basename ${SCRIPT_FILE} | tr '.' '_')_entry"
 	fn_exist ${FUNC_NAME} || return 5
 	${FUNC_NAME} $@
+}
+
+
+function verify_sha256 {
+	local SHA256=$1
+	local TARGET=$2
+	echo "$(cat ${SHA256} | head -n1 | awk '{print $1}') ${TARGET}" | sha256sum -c
+}
+
+
+function download_and_verify {
+	local SERVER_URL=$1 ; shift
+	local SERVER_PATH=$1; shift
+	[ "" == "${SERVER_URL}" ] && ERR "missing SERVER_URL" && return 1
+	[ "" == "${SERVER_PATH}" ] && ERR "missing SERVER_PATH" && return 2
+	[ "" != "${USERNAME}" ] && [ "" != "${PASSWORD}" ] && local WGET_OPTIONS="--user=${USERNAME} --password=${PASSWORD}"
+	local CACHE_DIR="/tmp"
+	local TARGET_FILE="${CACHE_DIR}/$(basename ${SERVER_PATH})"
+	local CHECKSUM_FILE="${TARGET_FILE}.sha256sum"
+	local EXIT_CODE="0"
+
+	# Download checksum file.
+	#
+	rm -f ${CHECKSUM_FILE}
+	wget -q ${WGET_OPTIONS} -O ${CHECKSUM_FILE} ${SERVER_URL}/${SERVER_PATH}.sha256sum; EXIT_CODE=$?
+	[ "0" != "${EXIT_CODE}" ] && ERR "failed to download checksum file ${SERVER_URL}/${SERVER_PATH}.sha256sum" && return 10
+
+	# Verify checksum if the target file exists. 
+	# When failed, then delete the target file.
+	#
+	if [ -f "${TARGET_FILE}" ]; then
+		verify_sha256 ${CHECKSUM_FILE} ${TARGET_FILE}; EXIT_CODE=$?
+		[ "0" != "${EXIT_CODE}" ] && INFO "${TARGET_FILE} mismatch sha256 checksum, force to re-download..." && rm -f ${TARGET_FILE}
+	fi
+
+	# Download target file if it doesn't exist.
+	#
+	if [ ! -f "${TARGET_FILE}" ]; then
+		wget ${WGET_OPTIONS} -O ${TARGET_FILE} ${SERVER_URL}/${SERVER_PATH}; EXIT_CODE=$?
+		[ "0" != "${EXIT_CODE}" ] && INFO "failed to download ${SERVER_URL}/${SERVER_PATH}" && return 11
+	fi
+
+	# Verify checksum.
+	#
+	verify_sha256 ${CHECKSUM_FILE} ${TARGET_FILE}; EXIT_CODE=$?
+	[ "0" != "${EXIT_CODE}" ] && INFO "${TARGET_FILE} mismatch sha256 checksum" && return 12
+	
+	# Invoke post-process function with the target file's path and rest arguments.
+	#
+	fn_exist ${CHAIN_FUNC} || return 0
+	INFO "chaining function ${CHAIN_FUNC} ${TARGET_FILE} $@" && ${CHAIN_FUNC} ${TARGET_FILE} $@
+}
+
+
+function install_tool_from_tic_0 {
+	local TARGET_FILE=$1
+	local TARGET_DIR=$2
+	INFO "install_tool_from_tic_0: TARGET_FILE => ${TARGET_FILE}"
+	INFO "install_tool_from_tic_0: TARGET_DIR => ${TARGET_DIR}"
+	run_my_cmd "cp ${TARGET_FILE} ${TARGET_DIR}"
+	run_my_cmd "chmod +x ${TARGET_DIR}/$(basename ${TARGET_FILE})"
+}
+
+
+function install_tool_from_tic {
+	local NAME=$1
+	local DIR=$2
+	[ "" == "${NAME}" ] && ERR "missing NAME" && return 1
+	[ "" == "${DIR}" ] && DIR="/usr/local/sbin"
+	local FILE_PATH="/embedded-linux/tools/${NAME}/${KERNEL}-${DIST_NAME}-${DIST_CODENAME}/${KERNEL_ARCHITECTURE}/${NAME}"
+	CHAIN_FUNC="install_tool_from_tic_0" \
+		download_and_verify \
+			${TIC_ARCHIVE_SERVER_URL} \
+			${FILE_PATH} \
+			${AD_ROOTFS_DIR}${DIR}
+}
+
+
+function test1 {
+	INFO "test1: arg1 => $1"
+	ls -al $1
 }
 
 
@@ -151,7 +235,10 @@ function pre_image {
 # Before running script inside rootfs with chroot and qemu (guest script).
 #
 function pre_guest {
-	load_script_and_run rootfs common || return 1
+	load_script_and_run boards common                  || return 1
+	load_script_and_run boards ${BOARD_NAME} true      || return 2
+	load_script_and_run profiles common                || return 3
+	load_script_and_run profiles ${BOARD_PROFILE} true || return 4
 	return 0
 }
 

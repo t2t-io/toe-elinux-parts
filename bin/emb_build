@@ -7,6 +7,7 @@ cat <<__EOF__
 kpartx
 losetup
 shyaml
+sha256sum
 python2:colorama
 python3:colorama
 __EOF__
