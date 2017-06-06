@@ -138,7 +138,7 @@ function load_script_and_run {
 function verify_sha256 {
 	local SHA256=$1
 	local TARGET=$2
-	echo "$(cat ${SHA256} | head -n1 | awk '{print $1}') ${TARGET}" | sha256sum -c
+	echo "$(cat ${SHA256} | head -n1 | awk '{print $1}') ${TARGET}" | sha256sum -c > /dev/null 2>&1
 }
 
 
@@ -200,19 +200,13 @@ function install_tool_from_tic {
 	local NAME=$1
 	local DIR=$2
 	[ "" == "${NAME}" ] && ERR "missing NAME" && return 1
-	[ "" == "${DIR}" ] && DIR="/usr/local/sbin"
+	[ "" == "${DIR}" ] && DIR=$(read_part_variable YAPPS_TOOLS_BIN)
 	local FILE_PATH="/embedded-linux/tools/${NAME}/${KERNEL}-${DIST_NAME}-${DIST_CODENAME}/${KERNEL_ARCHITECTURE}/${NAME}"
 	CHAIN_FUNC="install_tool_from_tic_0" \
 		download_and_verify \
 			${TIC_ARCHIVE_SERVER_URL} \
 			${FILE_PATH} \
 			${AD_ROOTFS_DIR}${DIR}
-}
-
-
-function test1 {
-	INFO "test1: arg1 => $1"
-	ls -al $1
 }
 
 

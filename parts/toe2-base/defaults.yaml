@@ -69,3 +69,10 @@ YAPPS_PROFILE_CONF: /etc/ttt.conf
 # The dotfiles.
 #
 YAGAMY_DOTFILES_DIR: /opt/dotfiles
+
+
+#
+# The default directory to install additional tools
+# downloaded from ARCHIVE_SERVER.
+#
+YAPPS_TOOLS_BIN: /usr/local/sbin
