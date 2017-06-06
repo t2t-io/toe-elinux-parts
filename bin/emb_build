@@ -139,6 +139,8 @@ function download_and_build {
 	local COMMAND=""
 	local EXIT_CODE="0"
 
+	mkdir -p ${CACHE_DIR}
+
 	INFO "checking ${DOWNLOAD_FILE} ..."
 	if [ ! -f "${DOWNLOAD_FILE}" ]; then
 		COMMAND="wget -O ${DOWNLOAD_FILE} ${DOWNLOAD_URL}"
