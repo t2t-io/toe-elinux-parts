@@ -93,8 +93,9 @@ function repartition_archive_directory {
 function read_part_variable {
 	local NAME=$1
 	local DEFAULT_VALUE=$2
-	local PART_UPPERCASE_NAME=$(echo ${PART_NAME} | tr '[a-z]' '[A-Z]' | tr '-' '_')
-	local VARIABLE_NAME="${PART_UPPERCASE_NAME}_${NAME}"
+	# local PART_UPPERCASE_NAME=$(echo ${PART_NAME} | tr '[a-z]' '[A-Z]' | tr '-' '_')
+	# local VARIABLE_NAME="${PART_UPPERCASE_NAME}_${NAME}"
+	local VARIABLE_NAME=$(echo "${PART_NAME}_${NAME}" | tr '[a-z]' '[A-Z]' | tr '-' '_')
 	local VARIABLE_VALUE=${!VARIABLE_NAME}
 	[ "" != "${VARIABLE_VALUE}" ] && echo ${VARIABLE_VALUE} && return 0
 	[ "" != "${DEFAULT_VALUE}" ] && echo ${DEFAULT_VALUE} && return 0

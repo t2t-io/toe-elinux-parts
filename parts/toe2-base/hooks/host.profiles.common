@@ -50,5 +50,8 @@
 
 function host_profiles_common_entry {
 	INFO "Hello host_profiles_common_entry"
+	if [ "foop" == "${BOARD_PROFILE}" ]; then
+		run_my_cmd "chmod -x ${AD_ROOTFS_DIR}/etc/network/if-up.d/ntpdate"
+	fi
 	return 0
 }
