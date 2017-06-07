@@ -213,6 +213,8 @@ function download_postprocess {
 			run_my_cmd "mv ${AD_ROOTFS_DIR}/lib/firmware ${AD_ROOTFS_DIR}/lib/firmware.$(date '+%Y%m%d')"
 			INFO "decompress ${TARGET_FILE}(${KV}) to rootfs ..."
 			tar xf ${TARGET_FILE} -C ${AD_ROOTFS_DIR}
+			run_my_cmd "sed -i 's/^#.*//g' ${AD_ROOTFS_DIR}${TARGET}"
+			run_my_cmd "sed -i '/^\\s*$/d' ${AD_ROOTFS_DIR}${TARGET}"
 			run_my_cmd "sed -i 's/^uname_r=.*//g' ${AD_ROOTFS_DIR}${TARGET}"
 			run_my_cmd "echo \"uname_r=${KV}\" >> ${AD_ROOTFS_DIR}${TARGET}"
 			show_rootfs_file ${TARGET}

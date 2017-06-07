@@ -66,6 +66,21 @@ YAPPS_PROFILE_CONF: /etc/ttt.conf
 
 
 #
+# The path of configuration file for all TiC (cloud) settings,
+# including:
+#   - RELEASE_URL
+#   - RELEASE_USER
+#   - RELEASE_PASS
+#   - ARCHIVE_URL
+#   - FILE_FC
+#   - FILE_SITE
+#   - FILE_USER
+#   - FILE_PSWD
+#
+YAPPS_CLOUD_CONF: /opt/ys/cloud.conf
+
+
+#
 # The dotfiles.
 #
 YAGAMY_DOTFILES_DIR: /opt/dotfiles
@@ -81,3 +96,10 @@ YAPPS_TOOLS_BIN: /usr/local/sbin
 # Kernel patch for BBGW: 
 #
 KERNEL_PATCH_BBGW: public:/embedded-linux/os/beaglebone/derivates/extractions/bone-debian-8.6-seeed-iot-armhf-2016-12-27-4gb-kernel-4.4.39-ti-r76.tar.xz
+
+
+#
+# Configuration file for SSH Welcome Messages, please don't modify it.
+#
+SYSTEM_SSH_MESSAGES_CONF: /etc/issue
+SYSTEM_SSH_NET_MESSAGES_CONF: /etc/issue.net

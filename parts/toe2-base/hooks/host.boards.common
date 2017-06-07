@@ -93,6 +93,43 @@ echo "PROFILE = ${BOARD_PROFILE}"
 }
 
 
+function generate_file_for_tic_conf {
+cat << __EOF__
+RELEASE_URL	${TIC_RELEASE_SERVER_URL}
+RELEASE_USER	${TIC_RELEASE_SERVER_USER}
+RELEASE_PASS	${TIC_RELEASE_SERVER_PASSWORD}
+ARCHIVE_URL	${TIC_ARCHIVE_SERVER_URL}
+FILE_FC	${TIC_FILE_SERVER_FC}
+FILE_SITE	${TIC_FILE_SERVER_SITE}
+FILE_USER	${TIC_FILE_SERVER_USER}
+FILE_PSWD	${TIC_FILE_SERVER_PASSWORD}
+__EOF__
+}
+
+
+function print_ssh_welcome_message {
+cat <<__EOF__
+$(cat ${AD_ROOTFS_DIR}/etc/os-release | grep "^PRETTY_NAME=" | awk -F'=' '{print $2}' | sed 's/"//g')... with souls from T2T
+
+Built-At: $(date)
+Author  : yagamy@t2t.io
+Board   : ${BOARD_NAME}
+Profile : ${BOARD_PROFILE}
+
+(c) $(date '+%Y') by T2T Inc.  All rights reserved
+__EOF__
+}
+
+
+function generate_file_for_ssh_messages {
+	print_ssh_welcome_message $@
+}
+
+function generate_file_for_ssh_net_messages {
+	print_ssh_welcome_message $@
+}
+
+
 function update_git_dir {
 	local VAR_NAME=$1
 	[ "" == "${VAR_NAME}" ] && ERR "missing VAR_NAME" && return 1
@@ -208,6 +245,9 @@ function host_boards_common_entry {
 	compose_file "build_information"  YAPPS_DATA_FILE_BUILD_INFO || return 1
 	compose_file "ys_conf"            YAPPS_SCRIPTS_CONF || return 1
 	compose_file "profile_conf"       YAPPS_PROFILE_CONF || return 1
+	compose_file "tic_conf"           YAPPS_CLOUD_CONF   || return 1
+	compose_file "ssh_messages"       SYSTEM_SSH_MESSAGES_CONF || return 1
+	compose_file "ssh_net_messages"   SYSTEM_SSH_NET_MESSAGES_CONF || return 1
 	attach_to_init_process || return 1
 	append_path_variable || return 1
 	append_etc_environment || return 1
