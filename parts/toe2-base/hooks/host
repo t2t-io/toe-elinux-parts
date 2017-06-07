@@ -16,7 +16,7 @@
 #  - BOARD_DIST_CODENAME   bone, raspbian, ...
 #  - DIST_CODENAME         trusty, jessie, ...
 #  - DIST_NAME             ubuntu, debian, ...
-#  - KERNEL_ARCHITECTURE   armv7l
+#  - KERNEL_ARCHITECTURE   armv7l (... armv6hf, armv7hf, armel, aarch64)
 #  - KERNEL                linux
 #  - KERNEL_VERSION        4.1.17-ti-rt-r47
 #
@@ -92,9 +92,13 @@ function repartition_archive_directory {
 
 function read_part_variable {
 	local NAME=$1
+	local DEFAULT_VALUE=$2
 	local PART_UPPERCASE_NAME=$(echo ${PART_NAME} | tr '[a-z]' '[A-Z]' | tr '-' '_')
 	local VARIABLE_NAME="${PART_UPPERCASE_NAME}_${NAME}"
-	echo ${!VARIABLE_NAME}
+	local VARIABLE_VALUE=${!VARIABLE_NAME}
+	[ "" != "${VARIABLE_VALUE}" ] && echo ${VARIABLE_VALUE} && return 0
+	[ "" != "${DEFAULT_VALUE}" ] && echo ${DEFAULT_VALUE} && return 0
+	return 1
 }
 
 
@@ -186,13 +190,42 @@ function download_and_verify {
 }
 
 
-function install_tool_from_tic_0 {
-	local TARGET_FILE=$1
-	local TARGET_DIR=$2
-	INFO "install_tool_from_tic_0: TARGET_FILE => ${TARGET_FILE}"
-	INFO "install_tool_from_tic_0: TARGET_DIR => ${TARGET_DIR}"
-	run_my_cmd "cp ${TARGET_FILE} ${TARGET_DIR}"
-	run_my_cmd "chmod +x ${TARGET_DIR}/$(basename ${TARGET_FILE})"
+function download_postprocess {
+	local TARGET_FILE=$1; shift
+	local ACTION=$1     ; shift
+	[ "" == "${ACTION}" ] && ERR "missing ACTION in download_postprocess()" && return 1
+
+	case "${ACTION}" in
+		tool)
+			local TARGET_DIR=$1
+			INFO "install_tool_from_tic_0: TARGET_FILE => ${TARGET_FILE}"
+			INFO "install_tool_from_tic_0: TARGET_DIR => ${TARGET_DIR}"
+			run_my_cmd "cp ${TARGET_FILE} ${TARGET_DIR}"
+			run_my_cmd "chmod +x ${TARGET_DIR}/$(basename ${TARGET_FILE})"
+			return 0
+			;;
+		kernel)
+			local KV=$(tar -tvf ${TARGET_FILE} | grep /boot/vmlinuz | sed 's/.*\/boot\/vmlinuz-//g')
+			[ "" == "${KV}" ] && ERR "missing kernel version information from ${TARGET_FILE}" && return 2
+			[ "bone" != "${BOARD_DIST_CODENAME}" ] && missing_implementation ${BOARD_DIST_CODENAME} && return 3
+			INFO "backup old firmwares ..."
+			run_my_cmd "mv ${AD_ROOTFS_DIR}/lib/firmware ${AD_ROOTFS_DIR}/lib/firmware.$(date '+%Y%m%d')"
+			INFO "decompress ${TARGET_FILE}(${KV}) to rootfs ..."
+			tar xf ${TARGET_FILE} -C ${AD_ROOTFS_DIR}
+			run_my_cmd "sed -i 's/^uname_r=.*//g' ${AD_ROOTFS_DIR}/boot/uEnv.txt"
+			run_my_cmd "echo \"uname_r=${KV}\" >> ${AD_ROOTFS_DIR}/boot/uEnv.txt"
+			show_rootfs_file /boot/uEnv.txt
+			return 0
+			;;
+		bootloader)
+			missing_implementation ${ACTION}
+			return 1
+			;;
+		*)
+			missing_implementation ${ACTION}
+			return 1
+			;;
+	esac
 }
 
 
@@ -202,11 +235,45 @@ function install_tool_from_tic {
 	[ "" == "${NAME}" ] && ERR "missing NAME" && return 1
 	[ "" == "${DIR}" ] && DIR=$(read_part_variable YAPPS_TOOLS_BIN)
 	local FILE_PATH="/embedded-linux/tools/${NAME}/${KERNEL}-${DIST_NAME}-${DIST_CODENAME}/${KERNEL_ARCHITECTURE}/${NAME}"
-	CHAIN_FUNC="install_tool_from_tic_0" \
+	CHAIN_FUNC="download_postprocess" \
 		download_and_verify \
 			${TIC_ARCHIVE_SERVER_URL} \
 			${FILE_PATH} \
+			"tool" \
 			${AD_ROOTFS_DIR}${DIR}
+}
+
+
+function apply_kernel_patch_from_tic {
+	local TYPE=$1
+	[ "" == "${TYPE}" ] && ERR "missing TYPE in apply_kernel_patch_from_tic" && return 1
+	case "${TYPE}" in
+		public)
+			local FILE_PATH=$2
+			[ "" == "${FILE_PATH}" ] && ERR "missing FILE_PATH in apply_kernel_patch_from_tic" && return 2
+			CHAIN_FUNC="download_postprocess" \
+				download_and_verify \
+					${TIC_ARCHIVE_SERVER_URL} \
+					${FILE_PATH} \
+					"kernel"
+			return $?
+			;;
+		private)
+			local VERSION=$2
+			local REVISION=$3
+			local FILE_PATH="/projects/${BOARD_PROFILE}/nodes/${BOARD_NAME}-${DIST_NAME}-patch/${BOARD_PROFILE}-${DIST_NAME}-patch-${VERSION}-${REVISION}-rootfs.tar.gz"
+			CHAIN_FUNC="download_postprocess" USERNAME=${TIC_RELEASE_SERVER_USER} PASSWORD=${TIC_RELEASE_SERVER_PASSWORD} \
+				download_and_verify \
+				${TIC_RELEASE_SERVER_URL} \
+				${FILE_PATH} \
+				"kernel"
+			return $?
+			;;
+		*)
+			missing_implementation ${TYPE}
+			return 1
+			;;
+	esac
 }
 
 

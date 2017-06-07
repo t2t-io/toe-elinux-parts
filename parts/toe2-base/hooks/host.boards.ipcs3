@@ -47,8 +47,10 @@
 #  - AD_ROOTFS_TYPE          = bone
 # 
 
-
 function host_boards_ipcs3_entry {
-	INFO "Hello host_boards_ipcs3_entry"
+	local ARGS=$(read_part_variable KERNEL_PATCH_${BOARD_NAME} "private:4.4.19:r4")
+	local ARGUMENTS=$(echo ${ARGS} | tr ':' ' ')
+	INFO "installing kernel patch with arguments: $(LIGHT_GREEN ${ARGUMENTS})"
+	apply_kernel_patch_from_tic ${ARGUMENTS} || return 1
 	return 0
 }

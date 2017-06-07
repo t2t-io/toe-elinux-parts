@@ -47,8 +47,10 @@
 #  - AD_ROOTFS_TYPE          = bone
 # 
 
-
 function host_boards_bbgw_entry {
-	INFO "Hello host_boards_bbgw_entry"
+	local ARGS=$(read_part_variable KERNEL_PATCH_${BOARD_NAME} "public:/embedded-linux/os/beaglebone/derivates/extractions/bone-debian-8.6-seeed-iot-armhf-2016-12-27-4gb-kernel-4.4.39-ti-r76.tar.xz")
+	local ARGUMENTS=$(echo ${ARGS} | tr ':' ' ')
+	INFO "installing kernel patch with arguments: $(LIGHT_GREEN ${ARGUMENTS})"
+	apply_kernel_patch_from_tic ${ARGUMENTS} || return 1
 	return 0
 }

@@ -76,3 +76,8 @@ YAGAMY_DOTFILES_DIR: /opt/dotfiles
 # downloaded from ARCHIVE_SERVER.
 #
 YAPPS_TOOLS_BIN: /usr/local/sbin
+
+#
+# Kernel patch for BBGW: 
+#
+KERNEL_PATCH_BBGW: public:/embedded-linux/os/beaglebone/derivates/extractions/bone-debian-8.6-seeed-iot-armhf-2016-12-27-4gb-kernel-4.4.39-ti-r76.tar.xz
