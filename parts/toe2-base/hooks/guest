@@ -54,7 +54,22 @@
 #  - BASH_UTIL_DIR
 #  - ELINUX_TOOLS_DIR
 #
+
+function disable_some_services {
+	if [ "ubuntu" == "${DIST_NAME}" ] && [ "trusty" == "${DIST_CODENAME}" ]; then
+		update-rc.d apache2 disable
+		update-rc.d dnsmasq disable
+		update-rc.d hostapd disable
+		apt-get remove udhcpd -y
+		return 0
+	else
+		missing_implementation ${DIST_NAME}-${DIST_CODENAME}
+		return 1
+	fi
+}
+
+
 function chroot_entry {
-	INFO "${PART_NAME} => uname -a"
+	disable_some_services || return 1
 	return 0
 }

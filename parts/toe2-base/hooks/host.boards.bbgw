@@ -47,10 +47,26 @@
 #  - AD_ROOTFS_TYPE          = bone
 # 
 
-function host_boards_bbgw_entry {
+function apply_kernel_patch_for_bbgw {
 	local ARGS=$(read_part_variable KERNEL_PATCH_${BOARD_NAME} "public:/embedded-linux/os/beaglebone/derivates/extractions/bone-debian-8.6-seeed-iot-armhf-2016-12-27-4gb-kernel-4.4.39-ti-r76.tar.xz")
 	local ARGUMENTS=$(echo ${ARGS} | tr ':' ' ')
 	INFO "installing kernel patch with arguments: $(LIGHT_GREEN ${ARGUMENTS})"
 	apply_kernel_patch_from_tic ${ARGUMENTS} || return 1
 	return 0
 }
+
+
+function enable_kernel_4_4_uarts_1_2_4 {
+	local TARGET="/boot/uEnv.txt"
+	run_my_cmd "sed -i 's/^cape_enable=.*//g' ${AD_ROOTFS_DIR}${TARGET}"
+	run_my_cmd "echo 'cape_enable=bone_capemgr.enable_partno=BB-UART1,BB-UART2,BB-UART4' >> ${AD_ROOTFS_DIR}${TARGET}"
+	show_rootfs_file ${TARGET}
+}
+
+
+function host_boards_bbgw_entry {
+	apply_kernel_patch_for_bbgw || return 1
+	enable_kernel_4_4_uarts_1_2_4 || return 1
+	return 0
+}
+
