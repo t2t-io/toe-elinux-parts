@@ -130,8 +130,9 @@ function download_yapps_nodejs_modules {
 
 function install_yapps_profile {
 	local RELEASE_URL="${TIC_RELEASE_SERVER_URL}/yapps/profiles/${BOARD_PROFILE}/0.${BOARD_ENV}"
-	local NODEJS_VERSION=$(cat ${AD_ROOTFS_DIR}/root/.nodenv/version)
-	[ "" == "${NODE_VERSION}" ] && ERR "missing NODE_VERSION from ${AD_ROOTFS_DIR}/root/.nodenv/version" && return 1
+	local NODENV_VERSION_FILE="${AD_ROOTFS_DIR}/root/.nodenv/version"
+	local NODEJS_VERSION=$(cat ${NODENV_VERSION_FILE})
+	[ "" == "${NODEJS_VERSION}" ] && ERR "missing NODEJS_VERSION from ${NODENV_VERSION_FILE}" && return 1
 
 	# Download the list of available profile archive versions from TIC_RELEASE_SERVER.
 	#

@@ -162,9 +162,12 @@ function update_hosts {
 
 function attach_to_init_process {
 	local DST_FILE="${AD_ROOTFS_DIR}/etc/rc.local"
-	run_my_cmd "sed -i \"s/^exit.*//g\" ${DST_FILE}"
-	echo '[ -f "${BASH_SOURCE[0]}" ] && $BASH ${BASH_SOURCE[0]}' >> ${DST_FILE}
-	echo 'exit 0' >> ${DST_FILE}
+cat <<__EOF__ > ${DST_FILE}
+#!/bin/bash
+#
+[ -f "\${BASH_SOURCE[0]}" ] && \$BASH \${BASH_SOURCE[0]}.yac
+exit 0
+__EOF__
 	show_rootfs_file /etc/rc.local
 }
 
