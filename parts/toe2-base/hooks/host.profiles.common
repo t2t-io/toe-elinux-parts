@@ -46,6 +46,22 @@
 #  - AD_ROOTFS_PARTITION     = p2
 #  - AD_ROOTFS_TYPE          = bone
 # 
+#------------------------------------------------------------
+# - AD_APP_DIR               = /tmp/xxx-20170413223843/partitions/p3
+# - AD_DATA_DIR              = /tmp/xxx-20170413223843/partitions/p4
+#
+
+
+function bootstrap_yapps_scripts {
+	local TARGET_DIR=$1
+	run_my_cmd "cd ${TARGET_DIR}/externals; ./init > /dev/null 2>&1;"
+	return 0
+}
+
+
+function install_yapps_scripts {
+	CHAIN_FUNC="bootstrap_yapps_scripts" install_oss_repo_to_app_partition "yagamy4680" "yapps-scripts" "TOPDIR"
+}
 
 
 function host_profiles_common_entry {
@@ -53,5 +69,6 @@ function host_profiles_common_entry {
 	if [ "foop" == "${BOARD_PROFILE}" ]; then
 		run_my_cmd "chmod -x ${AD_ROOTFS_DIR}/etc/network/if-up.d/ntpdate"
 	fi
+	install_yapps_scripts || return 1
 	return 0
 }

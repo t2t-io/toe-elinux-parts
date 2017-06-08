@@ -295,6 +295,33 @@ function make_device_alias {
 }
 
 
+function install_oss_repo_to_app_partition {
+	local GIT_USER=$1; shift
+	local GIT_REPO=$1; shift
+	local TARGET_PARENT_DIR=$1; shift
+	[ "" == "${GIT_USER}" ] && echo "missing GIT_USER" && return 1
+	[ "" == "${GIT_REPO}" ] && echo "missing GIT_REPO" && return 2
+	[ "" == "${GIT_TOKEN}" ] && local URL="https://github.com" || local URL="https://${GIT_TOKEN}@github.com"
+	[ "TOPDIR" == "${TARGET_PARENT_DIR}" ] && local TARGET_PARENT_DIR=""
+
+	local TARGET_DIR="${TARGET_PARENT_DIR}/${GIT_REPO}"
+	local TARGET_DIR_FULLPATH="${AD_APP_DIR}${TARGET_DIR}"
+	[ -d "${TARGET_DIR_FULLPATH}" ] && ERR "target directory ${TARGET_DIR_FULLPATH} already exists" && return 3
+
+	INFO "install repository $(GREEN ${GIT_USER})/$(LIGHT_GREEN ${GIT_REPO}) to $(GRAY ${TARGET_PARENT_DIR})"
+	
+	export COMMAND_VERBOSE_TAB=true
+	run_my_cmd "mkdir -p ${TARGET_DIR_FULLPATH}"
+	run_my_cmd "git clone -q ${URL}/${GIT_USER}/${GIT_REPO} ${TARGET_DIR_FULLPATH}"
+	unset COMMAND_VERBOSE_TAB
+
+	# Invoke post-process function with the target file's path and rest arguments.
+	#
+	fn_exist ${CHAIN_FUNC} || return 0
+	INFO "chaining function ${CHAIN_FUNC} ${TARGET_DIR_FULLPATH} $@" && ${CHAIN_FUNC} ${TARGET_DIR_FULLPATH} $@
+}
+
+
 # Before archive directory is manipulated.
 #
 function pre_image {
@@ -314,10 +341,16 @@ function pre_image {
 # Before running script inside rootfs with chroot and qemu (guest script).
 #
 function pre_guest {
+	local PARTITION_ID_APP=$(read_part_variable PARTITION_ID_APP 3)
+	local PARTITION_ID_DATA=$(read_part_variable PARTITION_ID_DATA 4)
+	export AD_APP_DIR="${AD_PARTITION_DIR}/p${PARTITION_ID_APP}"
+	export AD_DATA_DIR="${AD_PARTITION_DIR}/p${PARTITION_ID_DATA}"
 	load_script_and_run boards common                  || return 1
 	load_script_and_run boards ${BOARD_NAME} true      || return 2
 	load_script_and_run profiles common                || return 3
 	load_script_and_run profiles ${BOARD_PROFILE} true || return 4
+	unset AD_APP_DIR
+	unset AD_DATA_DIR
 	return 0
 }
 
