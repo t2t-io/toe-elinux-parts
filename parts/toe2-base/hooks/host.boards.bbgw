@@ -64,9 +64,19 @@ function enable_kernel_4_4_uarts_1_2_4 {
 }
 
 
+function setup_peripheral_aliases {
+	make_device_alias ttyO1 ttySENSOR || return 1
+	make_device_alias ttyO2 ttyRS485  || return 1
+	make_device_alias ttyO3 ttyBLEC   || return 1  # WiLink WL1835
+	make_device_alias ttyO4 ttyBLEP   || return 1  # Braveridge BVMCN5103 (Nordic nRF51822)
+	run_my_cmd "ls -al ${AD_ROOTFS_DIR}/opt/ys/dev"
+}
+
+
 function host_boards_bbgw_entry {
 	apply_kernel_patch_for_bbgw || return 1
 	enable_kernel_4_4_uarts_1_2_4 || return 1
+	setup_peripheral_aliases || return 1
 	return 0
 }
 

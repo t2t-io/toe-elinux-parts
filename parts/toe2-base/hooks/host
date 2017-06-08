@@ -281,6 +281,20 @@ function apply_kernel_patch_from_tic {
 }
 
 
+function make_device_alias {
+	local DEVICE=$1
+	local ALIAS=$2
+	[ "" == "${DEVICE}" ] && ERR "missing DEVICE" && return 1
+	[ "" == "${ALIAS}" ] && ERR "missing ALIAS" && return 2
+	local DEVICE_DIR="$(read_part_variable YAPPS_SCRIPTS_DATA_DIR /opt/ys)/dev"
+	local CURRENT_DIR=$(pwd)
+	run_my_cmd "mkdir -p ${AD_ROOTFS_DIR}${DEVICE_DIR}"
+	
+	[ -f "${AD_ROOTFS_DIR}${DEVICE_DIR}/${ALIAS}" ] && ERR "device alias ${DEVICE_DIR}/${ALIAS} already exists" && return 3
+	run_my_cmd "cd ${AD_ROOTFS_DIR}${DEVICE_DIR}; ln -s /dev/${DEVICE} ${ALIAS}"
+}
+
+
 # Before archive directory is manipulated.
 #
 function pre_image {
