@@ -54,7 +54,7 @@
 
 function bootstrap_yapps_scripts {
 	local TARGET_DIR=$1
-	run_my_cmd "cd ${TARGET_DIR}/externals; ./init > /dev/null 2>&1;"
+	run_my_cmd "cd ${TARGET_DIR}/externals; ./init"
 	return 0
 }
 
@@ -64,11 +64,139 @@ function install_yapps_scripts {
 }
 
 
+function get_profile_archive_list {
+	local OUTPUT=$1
+	local URL=$2
+	[ "" == "${OUTPUT}" ] && ERR "missing OUTPUT" && return 1
+	[ "" == "${URL}" ] && ERR "missing URL" && return 2
+	local TMP_FILE=$(mktemp /tmp/XXXXXX)
+	local WGET_OPTIONS="-q --user=${TIC_RELEASE_SERVER_USER} --password=${TIC_RELEASE_SERVER_PASSWORD}"
+	wget ${WGET_OPTIONS} -O ${TMP_FILE} ${URL}/
+	local EXIT_CODE=$?
+	[ "0" != "${EXIT_CODE}" ] && rm -f ${TMP_FILE} && touch ${OUTPUT} && return ${EXIT_CODE}
+	cat ${TMP_FILE} | jq -r '.[] | .name' | sort > ${OUTPUT}
+	rm -f ${TMP_FILE}
+}
+
+
+function download_yapps_nodejs_modules {
+	local VERSION=$1
+	local MODULE_DIR=$2
+	local MODULE_CONF=$3
+	[ "" == "${VERSION}" ] && ERR "missing VERSION" && return 1
+	[ "" == "${MODULE_DIR}" ] && ERR "missing MODULE_DIR" && return 2
+	[ "" == "${MODULE_CONF}" ] && ERR "missing MODULE_CONF" && return 3
+	[ -d "${MODULE_DIR}/node_modules" ] && INFO "${MODULE_DIR}/node_modules exists." && return 0
+	[ ! -f "${MODULE_CONF}" ] && INFO "missing ${MODULE_CONF}" && return 4
+
+	local OS_NAME="${KERNEL}-${DIST_NAME}-${DIST_CODENAME}"
+	local SERVER_URL="${TIC_ARCHIVE_SERVER_URL}/embedded-linux/nodejs-modules/${OS_NAME}/${KERNEL_ARCHITECTURE}/${VERSION}"
+	local NODE_MODUEL_ARCHIVES_URL="${SERVER_URL}/archives.txt"
+	local ARCHIVE_LIST_FILE="/tmp/$(basename ${NODE_MODUEL_ARCHIVES_URL})"
+	local MODULES=$(cat ${MODULE_CONF} | tr '\t' '@' | tr '\n' ' ')
+	local MODULES_X=$(echo ${MODULES} | sed 's/\ $//g' | tr ' ' ':')
+
+	# Download index file (archives.txt) to list all supported combinations of nodejs modules.
+	#
+	INFO "installing $(PURPLE ${MODULES}) for $(LIGHT_GREEN ${OS_NAME})/$(LIGHT_GREEN ${KERNEL_ARCHITECTURE}) ..."
+	INFO "checking module archives cached at cloud: ${NODE_MODUEL_ARCHIVES_URL}"
+	run_my_cmd "rm -f ${ARCHIVE_LIST_FILE}"
+	run_my_cmd "wget -q -O ${ARCHIVE_LIST_FILE} ${NODE_MODUEL_ARCHIVES_URL}"
+	[ "0" != "$?" ] && ERR "failed to download archives.txt from ${NODE_MODUEL_ARCHIVES_URL}" && return 5
+
+	# Find the combination of nodejs modules matched to the requirements of currnet 
+	# profile archive.
+	#
+	local UUID=$(cat ${ARCHIVE_LIST_FILE} | grep ${MODULES_X} | awk -F'\t' '{print $1}' | tail -n1)
+	local UUID_GZIP_FILE="${UUID}.tar.gz"
+	local GZIPPED_FILE="/tmp/${UUID_GZIP_FILE}"
+	run_my_cmd "rm -f ${ARCHIVE_LIST_FILE}"
+	[ "" == "${UUID}" ] && INFO "no matching modules" && return 6
+
+	# Download the archive file containing the required nodejs modules, 
+	#
+	INFO "downloading modules from cloud: $(LIGHT_GREEN ${UUID_GZIP_FILE})"
+	run_my_cmd "wget -q -O ${GZIPPED_FILE} ${SERVER_URL}/${UUID_GZIP_FILE}"
+	[ "0" != "$?" ] && INFO "failed to download ${UUID_GZIP_FILE} from ${SERVER_URL}/${UUID_GZIP_FILE}" && return 7
+
+	INFO "decompressing the downloaded module gzip file: ${GZIPPED_FILE}"
+	run_my_cmd "mkdir -p ${MODULE_DIR}"
+	run_my_cmd "tar xf ${GZIPPED_FILE} -C ${MODULE_DIR}"
+	[ "0" != "$?" ] && INFO "failed to uncompress ${GZIPPED_FILE}" && rm -f ${GZIPPED_FILE} && return 8
+	rm -f ${GZIPPED_FILE}
+	return 0
+}
+
+
+function install_yapps_profile {
+	local RELEASE_URL="${TIC_RELEASE_SERVER_URL}/yapps/profiles/${BOARD_PROFILE}/0.${BOARD_ENV}"
+	local NODEJS_VERSION=$(cat ${AD_ROOTFS_DIR}/root/.nodenv/version)
+	[ "" == "${NODE_VERSION}" ] && ERR "missing NODE_VERSION from ${AD_ROOTFS_DIR}/root/.nodenv/version" && return 1
+
+	# Download the list of available profile archive versions from TIC_RELEASE_SERVER.
+	#
+	local ARCHIVES=$(mktemp /tmp/XXXXXX)
+	get_profile_archive_list ${ARCHIVES} ${RELEASE_URL} || return 2
+	local COUNT=$(cat ${ARCHIVES} | wc -l | sed 's/\ //g')
+	[ "0" == "${COUNT}" ] && INFO "no archives for $(GREEN ${BOARD_PROFILE}) to download" && return 3
+
+	# Pick-up proper profile archive to download.
+	#
+	local YAPPS_PROFILE_VERSION=$(read_part_variable YAPPS_PROFILE_VERSION latest)
+	local ARCHIVE="${YAPPS_PROFILE_VERSION}.tar.gz"
+	[ "latest" == "${YAPPS_PROFILE_VERSION}" ] && ARCHIVE=$(cat ${ARCHIVES} | tail -n1)
+	[ "" == "$(cat ${ARCHIVES} | grep ${ARCHIVE})" ] && ERR "no such profile archive: ${ARCHIVE} (assigned from PROFILE_TARGET_VERSION)" && return 4
+
+	# Download the profile archive, and store in cache directory (`/tmp`).
+	#
+	local CACHE_DIR="/tmp"
+	local ARCHIVE_NAME="${ARCHIVE%%.*}"
+	local ARCHIVE_URL="${RELEASE_URL}/${ARCHIVE}"
+	local ARCHIVE_FILE="${CACHE_DIR}/${BOARD_PROFILE}-$(basename ${ARCHIVE_URL})"
+	local WGET_OPTIONS="--user=${TIC_RELEASE_SERVER_USER} --password=${TIC_RELEASE_SERVER_PASSWORD}"
+	run_my_cmd "rm -f ${ARCHIVE_FILE}"
+	wget ${WGET_OPTIONS} -O ${ARCHIVE_FILE} ${ARCHIVE_URL}
+	[ "0" != "$?" ] && ERR "failed to download ${ARCHIVE_URL}" && return 5
+	INFO "successfully download $(basename ${ARCHIVE_FILE})"
+
+	# Initiate profile directory under APP partition, including extracting
+	# the downloaded profile archive to APP partition.
+	#
+	local PROFILE_DIR="${AD_APP_DIR}/profiles/${BOARD_PROFILE}"
+	local TARGET_DIR="${PROFILE_DIR}/${ARCHIVE_NAME}"
+	run_my_cmd "mkdir -p ${TARGET_DIR}"
+	run_my_cmd "tar xf ${ARCHIVE_FILE} -C ${TARGET_DIR}"
+	run_my_cmd "rm -f ${ARCHIVE_FILE}"
+	run_my_cmd "rm -f ${ARCHIVES}"
+	run_my_cmd "echo \"${ARCHIVE_NAME}\" > ${PROFILE_DIR}/entry"
+	run_my_cmd "echo \"${BOARD_ENV}\"    > ${PROFILE_DIR}/env"
+
+	# Install nodejs modules for the profile archive.
+	#
+	local MODULE_DIR="${TARGET_DIR}/runtimes/nodejs/${NODEJS_VERSION}"
+	local MODULE_CONF="${TARGET_DIR}/apps/packages.conf"
+	local OS_NAME="${KERNEL}-${DIST_NAME}-${DIST_CODENAME}"
+	local OS_ARCH="${KERNEL_ARCHITECTURE}"
+	INFO "install_node_modules: NODE_VERSION = $(LIGHT_GREEN ${NODEJS_VERSION})"
+	INFO "install_node_modules: MODULE_DIR = $(LIGHT_GREEN ${MODULE_DIR})"
+	INFO "install_node_modules: MODULE_CONF = $(LIGHT_GREEN ${MODULE_CONF})"
+
+	if download_yapps_nodejs_modules ${NODEJS_VERSION} ${MODULE_DIR} ${MODULE_CONF} ; then
+		INFO "successfully download nodejs modules for $(basename ${ARCHIVE_FILE})"
+	else
+		# [todo] use chroot + qemu to run `npm install` on sd card to install those nodejs modules.
+		#
+		INFO "failed to download nodejs modules"
+	fi
+}
+
+
 function host_profiles_common_entry {
 	INFO "Hello host_profiles_common_entry"
 	if [ "foop" == "${BOARD_PROFILE}" ]; then
 		run_my_cmd "chmod -x ${AD_ROOTFS_DIR}/etc/network/if-up.d/ntpdate"
 	fi
 	install_yapps_scripts || return 1
+	install_yapps_profile || return 1
 	return 0
 }

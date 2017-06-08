@@ -66,6 +66,14 @@ YAPPS_PROFILE_CONF: /etc/ttt.conf
 
 
 #
+# The target version of profile archive to install. For example, 20170531c.
+# When the target version doesn't exist, then fallback to install latest
+# version. Or, you can directly specify `latest` to install latest version
+# of published profile archive.
+#
+YAPPS_PROFILE_VERSION: latest
+
+#
 # The path of configuration file for all TiC (cloud) settings,
 # including:
 #   - RELEASE_URL
