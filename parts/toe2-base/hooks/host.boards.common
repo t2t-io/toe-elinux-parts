@@ -198,6 +198,13 @@ __EOF__
 }
 
 
+function append_root_bashrc {
+cat <<__EOF__ >> ${AD_ROOTFS_DIR}/root/.bashrc
+source $(ed_part_variable YAPPS_SCRIPTS_DATA_DIR /opt/ys)/.bashrc
+__EOF__
+}
+
+
 function update_dotfiles {
 	update_git_dir YAGAMY_DOTFILES_DIR
 }
