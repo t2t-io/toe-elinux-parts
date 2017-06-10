@@ -57,10 +57,10 @@
 
 function disable_some_services {
 	if [ "ubuntu" == "${DIST_NAME}" ] && [ "trusty" == "${DIST_CODENAME}" ]; then
-		update-rc.d apache2 disable
-		update-rc.d dnsmasq disable
-		update-rc.d hostapd disable
-		apt-get remove udhcpd -y
+		run_my_cmd "update-rc.d apache2 disable"
+		run_my_cmd "update-rc.d dnsmasq disable"
+		run_my_cmd "update-rc.d hostapd disable"
+		run_my_cmd "apt-get remove udhcpd -y"
 		return 0
 	else
 		missing_implementation ${DIST_NAME}-${DIST_CODENAME}
