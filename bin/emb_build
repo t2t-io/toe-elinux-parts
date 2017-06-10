@@ -31,9 +31,9 @@ function is_argument_valid {
 function mycli_command_help {
 cd $(dirname $0)/../resources
 cat <<__EOF__
-${CLI_NAME} ${CLI_ACTION} $(GREEN PROFILE BOARD ENV) $(GRAY [PARTS_CONFIG_YAML])
+${CLI_NAME} ${CLI_ACTION} $(GRAY [-p PROFILE]) $(GRAY [-b BOARD]) $(GRAY [-e ENV])  $(YELLOW PARTS_CONFIG_YAML)
 
-Here are supported PROFILEs:
+Here are supported PROFILEs: (first one is the default value)
 $(read_without_comments ./profiles.conf | awk '{printf "\t- %s\n", $0}')
 
 Here are supported BOARDs:
@@ -88,9 +88,6 @@ function initiate_build_variables {
 	local ENVS_CONF="${CLI_RESOURCE_DIR}/envs.conf"
 
 	export BUILD_TEAM_NAME=${TEAM_NAME}
-	export BUILD_BOARD_PROFILE=$1; shift
-	export BUILD_BOARD_NAME=$1   ; shift
-	export BUILD_BOARD_ENV=$1    ; shift
 	[ "" == "${BUILD_BOARD_PROFILE}" ] && export BUILD_BOARD_PROFILE=$(read_without_comments ${PROFILES_CONF} | head -n1)
 	[ "" == "${BUILD_BOARD_NAME}" ]    && export BUILD_BOARD_NAME=$(read_without_comments ${BOARDS_CONF} | head -n1)
 	[ "" == "${BUILD_BOARD_ENV}" ]     && export BUILD_BOARD_ENV=$(read_without_comments ${ENVS_CONF} | head -n1)
@@ -121,7 +118,7 @@ function initiate_build_variables {
 	local TMP0=$(mktemp /tmp/XXXXXX)
 	local TMP1=$(mktemp /tmp/XXXXXX)
 	local TMP2=$(mktemp /tmp/XXXXXX)
-	TMP0=${TMP0} TMP1=${TMP1} TMP2=${TMP2} generate_parts_conf $@
+	TMP0=${TMP0} TMP1=${TMP1} TMP2=${TMP2} generate_parts_conf ${REST_ARGS}
 	EXIT_CODE=$?
 	rm -f ${TMP0} ${TMP1} ${TMP2}
 	[ "0" != "${EXIT_CODE}" ] && return ${EXIT_CODE}
@@ -186,17 +183,36 @@ function download_and_build {
 }
 
 
-function mycli_command_entry {
-	initiate_build_variables $@ || exit $?
-	download_and_build
+function parse_arguments {
+	while [ $# -ge 1 ]; do
+		case "$1" in
+			-p/--profile)
+				export BUILD_BOARD_PROFILE=$2
+				[ "" == "${BUILD_BOARD_PROFILE}" ] && ERR "please specify PROFILE for -p/--profile option" && return 1
+				shift
+				;;
+			-b/--board)
+				export BUILD_BOARD_NAME=$2
+				[ "" == "${BUILD_BOARD_NAME}" ] && ERR "please specify PROFILE for -b/--board option" && return 2
+				shift
+				;;
+			-e/--env)
+				export BUILD_BOARD_ENV=$2
+				[ "" == "${BUILD_BOARD_ENV}" ] && ERR "please specify ENVIRONMENT for -e/--env option" && return 3
+				shift
+				;;
+			*)
+				export REST_ARGS=$@
+				break
+				;;
+		esac
+		shift
+	done
+}
 
-	# INFO "CLI_DIR = ${CLI_DIR}"
-	# INFO "CLI_BIN_DIR = ${CLI_BIN_DIR}"
-	# INFO "CLI_HELPER_DIR = ${CLI_HELPER_DIR}"
-	# INFO "CLI_RESOURCE_DIR = ${CLI_RESOURCE_DIR}"
-	# INFO "CLI_NAME = ${CLI_NAME}"
-	# INFO "CLI_PROJECT_NAME = ${CLI_PROJECT_NAME}"
-	# INFO "CLI_ACTION = ${CLI_ACTION}"
-	# INFO "BASH_SOURCE = ${BASH_SOURCE[0]}"
-	# INFO "arguments: $@"
+
+function mycli_command_entry {
+	parse_arguments $@ || exit $?
+	initiate_build_variables || exit $?
+	download_and_build
 }
