@@ -4,6 +4,7 @@
 
 function mycli_command_prerequisites {
 cat <<__EOF__
+bc
 kpartx
 losetup
 shyaml
@@ -88,6 +89,7 @@ function initiate_build_variables {
 	local ENVS_CONF="${CLI_RESOURCE_DIR}/envs.conf"
 
 	export BUILD_TEAM_NAME=${TEAM_NAME}
+	[ "" == "${BUILD_LOG_YAML}" ]      && export BUILD_LOG_YAML="/tmp/build.yml"
 	[ "" == "${BUILD_BOARD_PROFILE}" ] && export BUILD_BOARD_PROFILE=$(read_without_comments ${PROFILES_CONF} | head -n1)
 	[ "" == "${BUILD_BOARD_NAME}" ]    && export BUILD_BOARD_NAME=$(read_without_comments ${BOARDS_CONF} | head -n1)
 	[ "" == "${BUILD_BOARD_ENV}" ]     && export BUILD_BOARD_ENV=$(read_without_comments ${ENVS_CONF} | head -n1)
@@ -108,6 +110,7 @@ function initiate_build_variables {
 		[ "" == "${BUILD_BOARD_IMAGE_URL}" ] && ERR "unexpected empty image url for ${BUILD_BOARD_PROFILE}/${BUILD_BOARD_NAME}/${BUILD_BOARD_ENV}" && return 1
 	fi
 
+	INFO "BUILD_LOG_YAML        = ${BUILD_LOG_YAML}"
 	INFO "BUILD_BOARD_PROFILE   = ${BUILD_BOARD_PROFILE}"
 	INFO "BUILD_BOARD_NAME      = ${BUILD_BOARD_NAME}"
 	INFO "BUILD_BOARD_ENV       = ${BUILD_BOARD_ENV}"
@@ -136,8 +139,11 @@ function download_and_build {
 	local BUILD_IMAGE="${OUTPUT_DIR}/${BUILD_NAME}.sqfs"
 	local COMMAND=""
 	local EXIT_CODE="0"
+	local START_TIME=$(date '+%s')
+	local START_TIMESTAMP=$(date)
 
 	mkdir -p ${CACHE_DIR}
+	rm -f ${BUILD_LOG_YAML}
 
 	INFO "checking ${DOWNLOAD_FILE} ..."
 	if [ ! -f "${DOWNLOAD_FILE}" ]; then
@@ -179,26 +185,62 @@ function download_and_build {
 	# Overlay umount.
 	#
 	${TEAM_BIN_DIR}/${CLI_NAME} overlay umount ${BUILD_DIR}
+
+	#
+	# Generate build log yaml file.
+	#
+	local END_TIME=$(date '+%s')
+	local END_TIMESTAMP=$(date)
+	local DURATION=$(echo "${END_TIME} - ${START_TIME}" | bc)
+	START_TIMESTAMP=${START_TIMESTAMP} \
+		END_TIMESTAMP=${END_TIMESTAMP} \
+		DURATION=${DURATION} \
+		BUILD_IMAGE=${BUILD_IMAGE} \
+		generate_build_log_yaml
+	INFO "build successfully. log here: ${BUILD_LOG_YAML}"
+	cat ${BUILD_LOG_YAML} | awk '{printf "\t%s\n", $0}'
+
+	# END.
 	return ${EXIT_CODE}
+}
+
+
+function generate_build_log_yaml {
+cat <<__EOF__ > ${BUILD_LOG_YAML}
+profile: ${BUILD_BOARD_PROFILE}
+board: ${BUILD_BOARD_NAME}
+env: ${BUILD_BOARD_ENV}
+file: ${BUILD_IMAGE}
+build:
+	start: ${START_TIMESTAMP}
+	end: ${END_TIMESTAMP}
+	duration: ${DURATION}
+__EOF__
 }
 
 
 function parse_arguments {
 	while [ $# -ge 1 ]; do
+		echo "processing $1"
 		case "$1" in
-			-p/--profile)
+			-l|--log)
+				export BUILD_LOG_YAML=$2
+				[ "" == "${BUILD_LOG_YAML}" ] && ERR "please specify LOG_YAML for -l/--log option" && return 1
+				shift
+				;;
+			-p|--profile)
 				export BUILD_BOARD_PROFILE=$2
-				[ "" == "${BUILD_BOARD_PROFILE}" ] && ERR "please specify PROFILE for -p/--profile option" && return 1
+				[ "" == "${BUILD_BOARD_PROFILE}" ] && ERR "please specify PROFILE for -p/--profile option" && return 2
 				shift
 				;;
-			-b/--board)
+			-b|--board)
 				export BUILD_BOARD_NAME=$2
-				[ "" == "${BUILD_BOARD_NAME}" ] && ERR "please specify PROFILE for -b/--board option" && return 2
+				[ "" == "${BUILD_BOARD_NAME}" ] && ERR "please specify PROFILE for -b/--board option" && return 3
 				shift
 				;;
-			-e/--env)
+			-e|--env)
 				export BUILD_BOARD_ENV=$2
-				[ "" == "${BUILD_BOARD_ENV}" ] && ERR "please specify ENVIRONMENT for -e/--env option" && return 3
+				[ "" == "${BUILD_BOARD_ENV}" ] && ERR "please specify ENVIRONMENT for -e/--env option" && return 4
 				shift
 				;;
 			*)
