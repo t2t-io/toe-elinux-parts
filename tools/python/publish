@@ -1,0 +1,153 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#
+# -------------------------------------------------------------------------
+# Copyright 2014-2015 T2T Inc. All rights reserved.
+#
+# FILE:
+#     yac_publish
+#
+# DESCRIPTION:
+#     Publish binary or documentation text file onto Release server
+#
+#
+# REVISION HISTORY
+#     2017/02/03, yagamy, initial version.
+#
+#
+# -------------------------------------------------------------------------
+#
+import os
+import sys
+from os.path import isfile, basename, dirname
+from optparse import OptionParser
+from datetime import datetime
+import colorama
+from colorama import Fore, Back, Style
+from pybars import Compiler
+
+sys.path.append('./share')
+from logger import Logger
+from tic import TicManager
+
+DATE_REVISION_PATTERN_LOWER = '{{date_rev}}'
+DATE_REVISION_PATTERN_UPPER = '{{DATE_REV}}'
+
+
+def YELLOW(string):
+    return "%s%s%s" % (Fore.YELLOW, string, Style.RESET_ALL)
+
+
+def get_latest_version(releasemd):
+    if not isfile(releasemd):
+        logger.error("no such file %s" % (releasemd))
+        sys.exit(2)
+    xs = open(releasemd, 'r').read()
+    xs = xs.split('\n')
+    xs = [ x for x in xs if x[:3] == '###' ]
+    xs = xs[0].split(' ')
+    return xs[1]
+
+
+def get_date_rev_prefix(compiler, pattern):
+    context = {'date_rev': '\t'}
+    template = compiler.compile(pattern)
+    output = template(context)
+    output = output.split('\t')
+    return output[0]
+
+
+# Input : `projects/{{PROFILE}}/apps/{{APP}}/{{MOBILE}}/{{version}}/tac-{{PROFILE}}-{{APP}}-{{version}}-{{date_rev}}.ipa`
+# Output: `projects/conscious/apps/user.app/android/0.6.0/tac-conscious-user.app-0.6.0-20170204{{date_rev}}.ipa`
+#
+def merge0(compiler, pattern, version):
+    helpers = {
+        'date_rev': lambda x: "%s%s" % (datetime.now().strftime('%Y%m%d'), DATE_REVISION_PATTERN_LOWER),
+        'DATE_REV': lambda x: "%s%s" % (datetime.now().strftime('%Y%m%d'), DATE_REVISION_PATTERN_UPPER)
+    }
+    template = compiler.compile(pattern)
+    context = dict(os.environ)
+    context['version'] = version
+    output = template(context, helpers=helpers)
+    return output
+
+
+# Input : `projects/conscious/apps/user.app/android/0.6.0/tac-conscious-user.app-0.6.0-20170204{{date_rev}}.ipa`
+# Output: `projects/conscious/apps/user.app/android/0.6.0/tac-conscious-user.app-0.6.0-20170204c.ipa`
+#
+def merge1(compiler, pattern, tic, logger):
+    prefix = get_date_rev_prefix(compiler, pattern)
+    path = dirname(prefix)
+    name = basename(prefix)
+    logger.debug("merge1: path => %s" % (path))
+    logger.debug("merge1: name => %s" % (name))
+    tic.submit_dummy_json(path)
+    files = tic.list_release_files(path)
+    files = [ f for f in files if f.find(name) == 0 ]
+    files.sort()
+    logger.debug("files => %s" % (files))
+    lower_tag = chr(ord(files[-1][len(name):][0]) + 1) if len(files) > 0 else 'a'
+    upper_tag = chr(ord(files[-1][len(name):][0]) + 1) if len(files) > 0 else 'A'
+    logger.info("pick up `%s`/`%s`" % (YELLOW(lower_tag), YELLOW(upper_tag)))
+    template = compiler.compile(pattern)
+    context = {'date_rev': lower_tag, 'DATE_REV': upper_tag}
+    output = template(context)
+    return output
+
+
+def main():
+    colorama.init()
+    parser = OptionParser()
+    parser.add_option("-v", "--verbose", action="store_true", dest="verbose", default=False, help="enable verbose outputs")
+    parser.add_option("-c", "--configs", type="string", dest="configs", default="", help="the list of yaml configuration files for TiC services, and first one is used for name generation, separated by comma")
+    parser.add_option("-r", "--releasemd", type="string", dest="releasemd", default="", help="RELEASE.md to retrieve version information")
+    parser.add_option("-p", "--path", type="string", dest="path", default="", help="the upload path pattern")
+
+    print("sys.path[0] => %s" % (sys.path[0]))
+
+    (options, args) = parser.parse_args()
+    if options.configs == "" or options.releasemd == "" or options.path == "":
+        parser.print_help()
+        sys.exit(1)
+
+    if len(args) == 0:
+        print("missing the binary or text file to be published")
+        parser.print_help()
+        return sys.exit(1)
+
+    [file] = args
+    if not isfile(file):
+        print("release file is missing: %s" % (file))
+        parser.print_help()
+        return sys.exit(1)
+
+    # Initialization
+    #
+    logger = Logger(options.verbose)
+    logger.debug("file => %s" % (file))
+    version = get_latest_version(options.releasemd)
+    logger.info("version from RELEASE.md => %s" % (YELLOW(version)))
+    configs = options.configs.split(':')
+    managers = [ TicManager(c, logger) for c in configs ]
+    tic, *slaves = managers     # (python3 list partial unpack)
+
+    # Generate the upload path
+    #
+    compiler = Compiler()
+    output = merge0(compiler, options.path, version)
+    logger.debug("output => %s" % (YELLOW(output)))
+    output = merge1(compiler, output, tic, logger) if output.find(DATE_REVISION_PATTERN) != -1 else output
+    logger.info("upload path => %s" % (YELLOW(output)))
+
+    # Publish file to master release server (`tic`)
+    # and other slave servers (`slaves`) if any.
+    #
+    tic.publish_file(file, output, slaves)
+    return
+
+
+
+# Entry-point
+#
+if __name__ == '__main__':
+    main()
