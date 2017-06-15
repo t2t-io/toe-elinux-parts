@@ -308,7 +308,7 @@ function install_oss_repo_to_app_partition {
 	local TARGET_DIR_FULLPATH="${AD_APP_DIR}${TARGET_DIR}"
 	[ -d "${TARGET_DIR_FULLPATH}" ] && ERR "target directory ${TARGET_DIR_FULLPATH} already exists" && return 3
 
-	INFO "install repository $(GREEN ${GIT_USER})/$(LIGHT_GREEN ${GIT_REPO}) to $(GRAY ${TARGET_PARENT_DIR})"
+	INFO "install repository $(GREEN ${GIT_USER})/$(LIGHT_GREEN ${GIT_REPO}) to $(GRAY ${TARGET_DIR_FULLPATH})"
 	
 	export COMMAND_VERBOSE_TAB=true
 	run_my_cmd "mkdir -p ${TARGET_DIR_FULLPATH}"

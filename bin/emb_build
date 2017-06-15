@@ -98,7 +98,7 @@ function initiate_build_variables {
 	[ "" == "$(is_argument_valid ${BOARDS_CONF} ${BUILD_BOARD_NAME})" ]      && ERR "no such board: ${BUILD_BOARD_NAME}" && return 1
 	[ "" == "$(is_argument_valid ${ENVS_CONF} ${BUILD_BOARD_ENV})" ]         && ERR "no such env: ${BUILD_BOARD_ENV}" && return 1
 
-	export BUILD_NAME="${BUILD_BOARD_PROFILE}-${BUILD_BOARD_NAME}-$(date '+%Y%m%d%H%M%S')"
+	export BUILD_NAME="${BUILD_BOARD_PROFILE}-${BUILD_BOARD_NAME}-${BUILD_BOARD_ENV}-$(date '+%Y%m%d%H%M%S')"
 	export CACHE_DIR="/var/lib/${TEAM_FULLNAME}"
 	export OUTPUT_DIR="/tmp"
 	export BUILD_PARTS_CONF_JSON="${OUTPUT_DIR}/${BUILD_NAME}.json"
