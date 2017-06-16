@@ -222,8 +222,12 @@ function download_postprocess {
 			return 0
 			;;
 		bootloader)
-			missing_implementation ${ACTION}
-			return 1
+			run_my_cmd "ls -al ${AD_PARTITION_DIR}/p1"
+			run_my_cmd "tar xvf ${TARGET_FILE} -C ${AD_PARTITION_DIR}/p1"
+			run_my_cmd "chown root:root ${AD_PARTITION_DIR}/p1/MLO"
+			run_my_cmd "chown root:root ${AD_PARTITION_DIR}/p1/u-boot.img"
+			run_my_cmd "ls -al ${AD_PARTITION_DIR}/p1"
+			return 0
 			;;
 		*)
 			missing_implementation ${ACTION}
@@ -276,6 +280,31 @@ function apply_kernel_patch_from_tic {
 		*)
 			missing_implementation ${TYPE}
 			return 1
+			;;
+	esac
+}
+
+
+function apply_bootloader_patch_from_tic {
+	local TYPE=$1
+	[ "" == "${TYPE}" ] && ERR "missing TYPE in apply_bootloader_patch_from_tic" && return 1
+	case "${TYPE}" in
+		public)
+			missing_implementation ${TYPE}
+			;;
+		private)
+			local VERSION=$2
+			local REVISION=$3
+			local FILE_PATH="/projects/${BOARD_PROFILE}/nodes/${BOARD_NAME}-${DIST_NAME}-patch/${BOARD_PROFILE}-${DIST_NAME}-patch-${VERSION}-${REVISION}-bootloader.tar.gz"
+			CHAIN_FUNC="download_postprocess" USERNAME=${TIC_RELEASE_SERVER_USER} PASSWORD=${TIC_RELEASE_SERVER_PASSWORD} \
+				download_and_verify \
+				${TIC_RELEASE_SERVER_URL} \
+				${FILE_PATH} \
+				"bootloader"
+			return $?
+			;;
+		*)
+			missing_implementation ${TYPE}
 			;;
 	esac
 }

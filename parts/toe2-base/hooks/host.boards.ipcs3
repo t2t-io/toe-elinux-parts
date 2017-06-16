@@ -56,6 +56,15 @@ function apply_kernel_patch_for_ipcs3 {
 }
 
 
+function apply_bootloader_patch_for_ipcs3 {
+	local ARGS=$(read_part_variable BOOTLOADER_PATCH_${BOARD_NAME} "private:3.14.43:r1")
+	local ARGUMENTS=$(echo ${ARGS} | tr ':' ' ')
+	INFO "installing bootloader patch with arguments: $(LIGHT_GREEN ${ARGUMENTS})"
+	apply_bootloader_patch_from_tic ${ARGUMENTS} || return 1
+	return 0
+}
+
+
 function setup_peripheral_aliases {
 	make_device_alias ttyO1 ttySENSOR || return 1
 	make_device_alias ttyO3 ttyBLEP   || return 1  # Braveridge BVMCN5103 (Nordic nRF51822)
@@ -65,7 +74,8 @@ function setup_peripheral_aliases {
 
 
 function host_boards_ipcs3_entry {
-	apply_kernel_patch_for_ipcs3 || return 1
-	setup_peripheral_aliases || return 1
+	apply_bootloader_patch_for_ipcs3 || return 1
+	apply_kernel_patch_for_ipcs3     || return 1
+	setup_peripheral_aliases         || return 1
 	return 0
 }
