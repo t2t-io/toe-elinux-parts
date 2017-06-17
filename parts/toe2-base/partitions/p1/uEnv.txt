@@ -1,0 +1,26 @@
+#!/bin/bash uboot
+##These are needed to be compliant with Angstrom's 2013.06.20 u-boot.
+
+loadaddr=0x82000000
+fdtaddr=0x88000000
+rdaddr=0x88080000
+
+initrd_high=0xffffffff
+fdt_high=0xffffffff
+
+mmc_disk=0
+mmc_partition=2
+
+##These are needed to be compliant with Debian 2014-05-14 u-boot.
+
+loadximage=echo debug: [${mmc_disk}:${mmc_partition}:/boot/vmlinuz-${uname_r}] ... ; load mmc ${mmc_disk}:${mmc_partition} ${loadaddr} /boot/vmlinuz-${uname_r}
+loadxfdt=echo debug: [${mmc_disk}:${mmc_partition}:/boot/dtbs/${uname_r}/${fdtfile}] ... ;load mmc ${mmc_disk}:${mmc_partition} ${fdtaddr} /boot/dtbs/${uname_r}/${fdtfile}
+loadxrd=echo debug: [${mmc_disk}:${mmc_partition}:/boot/initrd.img-${uname_r}] ... ; if load mmc ${mmc_disk}:${mmc_partition} ${rdaddr} /boot/initrd.img-${uname_r}; then setenv r_opts ${rdaddr}:${filesize} ; else setenv r_opts - ; fi
+loaduEnvtxt=echo debug: [${mmc_disk}:${mmc_partition}:/boot/uEnv.txt] ... ; load mmc ${mmc_disk}:${mmc_partition} ${loadaddr} /boot/uEnv.txt ; env import -t ${loadaddr} ${filesize};
+check_dtb=if test -n ${dtb}; then setenv fdtfile ${dtb};fi;
+loadall=run loaduEnvtxt; run check_dtb; run loadximage; run loadxrd; run loadxfdt;
+
+# mmcargs=setenv bootargs console=tty0 console=${console} ${optargs} ${cape_disable} ${cape_enable} root=UUID=3aa78ce7-9b66-4a35-9f9d-d5137ab9e2ba rootfstype=${mmcrootfstype} ${cmdline}
+mmcargs=setenv bootargs console=tty0 console=${console} ${optargs} ${cape_disable} ${cape_enable} root=/dev/mmcblk${mmc_disk}p${mmc_partition} rootfstype=${mmcrootfstype} ${cmdline}
+
+uenvcmd=run loadall; run mmcargs; echo debug: [${bootargs}] ... ; echo debug: [bootz ${loadaddr} ${r_opts} ${fdtaddr}] ... ; bootz ${loadaddr} ${r_opts} ${fdtaddr};

@@ -33,6 +33,16 @@ PARTITION_ID_APP: 3
 PARTITION_ID_DATA: 4
 
 
+# The methodology to mount rootfs partition, there are
+# 3 possible methodologies:
+#
+#   - `partition`, using the fixed partition block device to mount, e.g. /dev/mmcblk0p2
+#   - `uuid`, using the given uuid to mount, e.g. 3aa78ce7-9b66-4a35-9f9d-d5137ab9e2ba
+#   - `label`, using the given label name to mount, e.g. rootfs
+#
+FSTAB_ROOT_MOUNT_METHOD: partition
+
+
 #
 # The directory to store the repository `yapps-scripts` 
 # (https://github.com/yagamy4680/yapps-scripts).
